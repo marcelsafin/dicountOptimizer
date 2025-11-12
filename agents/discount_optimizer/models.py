@@ -49,6 +49,9 @@ class DiscountItem:
     discount_percent: float
     expiration_date: date
     is_organic: bool
+    store_address: str = ""
+    travel_distance_km: float = 0.0
+    travel_time_minutes: float = 0.0
 
 
 @dataclass
@@ -84,7 +87,10 @@ MOCK_DISCOUNTS: List[DiscountItem] = [
         discount_price=18.0,
         discount_percent=28.0,
         expiration_date=date.today() + timedelta(days=5),
-        is_organic=False
+        is_organic=False,
+        store_address="Nørrebrogade 45, 2200 København N",
+        travel_distance_km=1.5,
+        travel_time_minutes=8.0
     ),
     DiscountItem(
         product_name="Hakket oksekød",
@@ -94,7 +100,10 @@ MOCK_DISCOUNTS: List[DiscountItem] = [
         discount_price=49.0,
         discount_percent=25.0,
         expiration_date=date.today() + timedelta(days=3),
-        is_organic=False
+        is_organic=False,
+        store_address="Nørrebrogade 45, 2200 København N",
+        travel_distance_km=1.5,
+        travel_time_minutes=8.0
     ),
     DiscountItem(
         product_name="Ost",
@@ -104,7 +113,10 @@ MOCK_DISCOUNTS: List[DiscountItem] = [
         discount_price=35.0,
         discount_percent=22.0,
         expiration_date=date.today() + timedelta(days=7),
-        is_organic=False
+        is_organic=False,
+        store_address="Nørrebrogade 45, 2200 København N",
+        travel_distance_km=1.5,
+        travel_time_minutes=8.0
     ),
     DiscountItem(
         product_name="Salat",
@@ -114,7 +126,10 @@ MOCK_DISCOUNTS: List[DiscountItem] = [
         discount_price=15.0,
         discount_percent=25.0,
         expiration_date=date.today() + timedelta(days=2),
-        is_organic=True
+        is_organic=True,
+        store_address="Nørrebrogade 45, 2200 København N",
+        travel_distance_km=1.5,
+        travel_time_minutes=8.0
     ),
     
     # Føtex - Vesterbro (West of Copenhagen center)
@@ -126,7 +141,10 @@ MOCK_DISCOUNTS: List[DiscountItem] = [
         discount_price=68.0,
         discount_percent=20.0,
         expiration_date=date.today() + timedelta(days=4),
-        is_organic=True
+        is_organic=True,
+        store_address="Vesterbrogade 89, 1620 København V",
+        travel_distance_km=1.2,
+        travel_time_minutes=6.0
     ),
     DiscountItem(
         product_name="Creme fraiche",
@@ -136,7 +154,10 @@ MOCK_DISCOUNTS: List[DiscountItem] = [
         discount_price=16.0,
         discount_percent=27.0,
         expiration_date=date.today() + timedelta(days=6),
-        is_organic=False
+        is_organic=False,
+        store_address="Vesterbrogade 89, 1620 København V",
+        travel_distance_km=1.2,
+        travel_time_minutes=6.0
     ),
     DiscountItem(
         product_name="Salsa",
@@ -146,7 +167,10 @@ MOCK_DISCOUNTS: List[DiscountItem] = [
         discount_price=22.0,
         discount_percent=27.0,
         expiration_date=date.today() + timedelta(days=10),
-        is_organic=False
+        is_organic=False,
+        store_address="Vesterbrogade 89, 1620 København V",
+        travel_distance_km=1.2,
+        travel_time_minutes=6.0
     ),
     DiscountItem(
         product_name="Tomater",
@@ -156,7 +180,10 @@ MOCK_DISCOUNTS: List[DiscountItem] = [
         discount_price=18.0,
         discount_percent=28.0,
         expiration_date=date.today() + timedelta(days=3),
-        is_organic=True
+        is_organic=True,
+        store_address="Vesterbrogade 89, 1620 København V",
+        travel_distance_km=1.2,
+        travel_time_minutes=6.0
     ),
     DiscountItem(
         product_name="Pasta",
@@ -166,7 +193,10 @@ MOCK_DISCOUNTS: List[DiscountItem] = [
         discount_price=12.0,
         discount_percent=33.0,
         expiration_date=date.today() + timedelta(days=14),
-        is_organic=False
+        is_organic=False,
+        store_address="Vesterbrogade 89, 1620 København V",
+        travel_distance_km=1.2,
+        travel_time_minutes=6.0
     ),
     
     # Rema 1000 - Østerbro (East of Copenhagen center)
@@ -178,7 +208,10 @@ MOCK_DISCOUNTS: List[DiscountItem] = [
         discount_price=20.0,
         discount_percent=20.0,
         expiration_date=date.today() + timedelta(days=6),
-        is_organic=False
+        is_organic=False,
+        store_address="Østerbrogade 112, 2100 København Ø",
+        travel_distance_km=2.8,
+        travel_time_minutes=12.0
     ),
     DiscountItem(
         product_name="Tomatpuré",
@@ -188,7 +221,10 @@ MOCK_DISCOUNTS: List[DiscountItem] = [
         discount_price=10.0,
         discount_percent=33.0,
         expiration_date=date.today() + timedelta(days=30),
-        is_organic=False
+        is_organic=False,
+        store_address="Østerbrogade 112, 2100 København Ø",
+        travel_distance_km=2.8,
+        travel_time_minutes=12.0
     ),
     DiscountItem(
         product_name="Økologisk ost",
@@ -198,7 +234,10 @@ MOCK_DISCOUNTS: List[DiscountItem] = [
         discount_price=42.0,
         discount_percent=24.0,
         expiration_date=date.today() + timedelta(days=8),
-        is_organic=True
+        is_organic=True,
+        store_address="Østerbrogade 112, 2100 København Ø",
+        travel_distance_km=2.8,
+        travel_time_minutes=12.0
     ),
     DiscountItem(
         product_name="Løg",
@@ -208,7 +247,10 @@ MOCK_DISCOUNTS: List[DiscountItem] = [
         discount_price=8.0,
         discount_percent=33.0,
         expiration_date=date.today() + timedelta(days=5),
-        is_organic=False
+        is_organic=False,
+        store_address="Østerbrogade 112, 2100 København Ø",
+        travel_distance_km=2.8,
+        travel_time_minutes=12.0
     ),
     
     # Netto - Amager (South of Copenhagen)
@@ -220,7 +262,10 @@ MOCK_DISCOUNTS: List[DiscountItem] = [
         discount_price=10.0,
         discount_percent=33.0,
         expiration_date=date.today() + timedelta(days=4),
-        is_organic=False
+        is_organic=False,
+        store_address="Amagerbrogade 55, 2300 København S",
+        travel_distance_km=3.5,
+        travel_time_minutes=15.0
     ),
     DiscountItem(
         product_name="Kartofler",
@@ -230,7 +275,10 @@ MOCK_DISCOUNTS: List[DiscountItem] = [
         discount_price=14.0,
         discount_percent=30.0,
         expiration_date=date.today() + timedelta(days=7),
-        is_organic=False
+        is_organic=False,
+        store_address="Amagerbrogade 55, 2300 København S",
+        travel_distance_km=3.5,
+        travel_time_minutes=15.0
     ),
     DiscountItem(
         product_name="Grøntsagsbouillon",
@@ -240,7 +288,10 @@ MOCK_DISCOUNTS: List[DiscountItem] = [
         discount_price=13.0,
         discount_percent=28.0,
         expiration_date=date.today() + timedelta(days=60),
-        is_organic=False
+        is_organic=False,
+        store_address="Amagerbrogade 55, 2300 København S",
+        travel_distance_km=3.5,
+        travel_time_minutes=15.0
     ),
     DiscountItem(
         product_name="Bønner",
@@ -250,7 +301,10 @@ MOCK_DISCOUNTS: List[DiscountItem] = [
         discount_price=9.0,
         discount_percent=25.0,
         expiration_date=date.today() + timedelta(days=90),
-        is_organic=False
+        is_organic=False,
+        store_address="Amagerbrogade 55, 2300 København S",
+        travel_distance_km=3.5,
+        travel_time_minutes=15.0
     ),
     
     # Føtex - City Center
@@ -262,7 +316,10 @@ MOCK_DISCOUNTS: List[DiscountItem] = [
         discount_price=7.0,
         discount_percent=30.0,
         expiration_date=date.today() + timedelta(days=5),
-        is_organic=False
+        is_organic=False,
+        store_address="Frederiksberggade 21, 1459 København K",
+        travel_distance_km=0.5,
+        travel_time_minutes=3.0
     ),
     DiscountItem(
         product_name="Parmesan",
@@ -272,7 +329,10 @@ MOCK_DISCOUNTS: List[DiscountItem] = [
         discount_price=38.0,
         discount_percent=21.0,
         expiration_date=date.today() + timedelta(days=12),
-        is_organic=False
+        is_organic=False,
+        store_address="Frederiksberggade 21, 1459 København K",
+        travel_distance_km=0.5,
+        travel_time_minutes=3.0
     ),
     DiscountItem(
         product_name="Selleri",
@@ -282,7 +342,10 @@ MOCK_DISCOUNTS: List[DiscountItem] = [
         discount_price=13.0,
         discount_percent=28.0,
         expiration_date=date.today() + timedelta(days=3),
-        is_organic=True
+        is_organic=True,
+        store_address="Frederiksberggade 21, 1459 København K",
+        travel_distance_km=0.5,
+        travel_time_minutes=3.0
     ),
 ]
 

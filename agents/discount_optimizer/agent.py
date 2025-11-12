@@ -91,12 +91,15 @@ def optimize_shopping(
     
     try:
         # Stage 2: Discount Matching
-        matcher = DiscountMatcher()
+        matcher = DiscountMatcher(use_real_api=True)
         
-        # Load all available discounts
-        all_discounts = matcher.load_discounts()
+        # Load all available discounts (API will filter by location automatically)
+        all_discounts = matcher.load_discounts(
+            location=user_input.location,
+            radius_km=20.0
+        )
         
-        # Filter by location (within 20km radius)
+        # Additional location filtering using Haversine (for mock data or verification)
         location_filtered = matcher.filter_by_location(
             all_discounts,
             user_input.location,

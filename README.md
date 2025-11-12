@@ -17,17 +17,38 @@ source .venv/bin/activate  # På macOS/Linux
 pip install -r requirements.txt
 ```
 
-### 2. Konfigurera API-nyckel
+### 2. Konfigurera API-nycklar
+
+#### Salling Group API (för riktiga rabattdata)
+
+1. Skaffa en Salling Group API-nyckel från: https://developer.sallinggroup.com/
+2. Registrera dig och skapa en ny applikation
+3. Kopiera din API-nyckel
+
+#### Google AI API (för AI-funktioner)
 
 1. Skaffa en Google AI API-nyckel från: https://aistudio.google.com/app/apikey
-2. Öppna `.env` filen i projektets root
-3. Ersätt `your_api_key_here` med din faktiska API-nyckel:
+
+#### Google Maps API (för geolokalisering)
+
+1. Gå till Google Cloud Console: https://console.cloud.google.com/
+2. Aktivera följande APIs:
+   - Geocoding API
+   - Places API
+   - Distance Matrix API
+3. Skapa en API-nyckel
+
+#### Konfigurera .env-filen
+
+Öppna `.env` filen i projektets root och lägg till dina API-nycklar:
 
 ```bash
-GOOGLE_API_KEY=din_riktiga_api_nyckel_här
+SALLING_GROUP_API_KEY=din_salling_api_nyckel_här
+GOOGLE_API_KEY=din_google_ai_api_nyckel_här
+GOOGLE_MAPS_API_KEY=din_google_maps_api_nyckel_här
 ```
 
-**VIKTIGT:** Dela aldrig din API-nyckel publikt! Filen `.env` är redan i `.gitignore`.
+**VIKTIGT:** Dela aldrig dina API-nycklar publikt! Filen `.env` är redan i `.gitignore`.
 
 ## Kör agenten
 

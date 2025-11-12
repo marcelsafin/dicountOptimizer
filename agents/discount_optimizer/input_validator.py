@@ -4,8 +4,9 @@ Validates and sanitizes user inputs according to requirements.
 """
 
 from datetime import date, timedelta
-from typing import Dict, Any, List
+from typing import Dict, Any, List, Optional
 from .models import UserInput, Location, OptimizationPreferences, Timeframe
+from .google_maps_service import GoogleMapsService
 
 
 class ValidationError(Exception):
@@ -15,6 +16,18 @@ class ValidationError(Exception):
 
 class InputValidator:
     """Validates and sanitizes user inputs for the Shopping Optimizer."""
+    
+    def __init__(self, google_maps_service: Optional[GoogleMapsService] = None):
+        """
+        Initialize the InputValidator.
+        
+        Args:
+            google_maps_service: Optional GoogleMapsService instance for geocoding.
+                                If not provided, a default instance will be created.
+        """
+        self.google_maps_service = google_maps_service or GoogleMapsService(use_mock=True)
+        # Default location (Copenhagen center) as fallback
+        self.default_location = Location(55.6761, 12.5683)
     
     def validate(self, raw_input: Dict[str, Any]) -> UserInput:
         """
@@ -50,28 +63,50 @@ class InputValidator:
     
     def _validate_location(self, location_data: Dict[str, Any]) -> Location:
         """
-        Validate location coordinates.
+        Validate location - accepts either address string or coordinates.
+        If address is provided, uses GoogleMapsService to geocode it.
         
         Args:
-            location_data: Dictionary with 'latitude' and 'longitude' keys
+            location_data: Dictionary with either:
+                          - 'address': string address to geocode
+                          - 'latitude' and 'longitude': numeric coordinates
             
         Returns:
             Location: Validated location object
             
         Raises:
-            ValidationError: If coordinates are invalid
+            ValidationError: If location cannot be determined
         """
+        # Check if address is provided
+        address = location_data.get('address', '').strip()
+        
+        if address:
+            # Use geocoding to convert address to coordinates
+            try:
+                location = self.google_maps_service.geocode_address(address)
+                return location
+            except Exception as e:
+                # Fallback to default location if geocoding fails
+                print(f"Warning: Geocoding failed for address '{address}': {e}")
+                print(f"Using default location (Copenhagen center)")
+                return self.default_location
+        
+        # Otherwise, try to parse coordinates
         try:
             latitude = float(location_data.get('latitude', 0))
             longitude = float(location_data.get('longitude', 0))
         except (ValueError, TypeError):
-            raise ValidationError("Location coordinates must be valid numbers")
+            raise ValidationError(
+                "Please provide either a valid address or numeric coordinates. "
+                "Address example: 'Nørrebrogade 45, København' or coordinates (latitude, longitude)"
+            )
         
         if not self.validate_location_coordinates(latitude, longitude):
             raise ValidationError(
                 f"Invalid coordinates: latitude must be between -90 and 90, "
                 f"longitude must be between -180 and 180. "
-                f"Got latitude={latitude}, longitude={longitude}"
+                f"Got latitude={latitude}, longitude={longitude}. "
+                f"Alternatively, provide an address string."
             )
         
         return Location(latitude=latitude, longitude=longitude)

@@ -25,7 +25,7 @@ class SallingAPIClient:
     Client for interacting with the Salling Group API to fetch discount campaigns.
     """
     
-    BASE_URL = "https://api.sallinggroup.com/v1-beta"
+    BASE_URL = "https://api.sallinggroup.com/v1"
     CACHE_TTL_HOURS = 24
     
     def __init__(self, api_key: Optional[str] = None):
@@ -40,8 +40,7 @@ class SallingAPIClient:
             raise ValueError("Salling Group API key is required")
         
         self.headers = {
-            "Authorization": f"Bearer {self.api_key}",
-            "Content-Type": "application/json"
+            "Authorization": f"Bearer {self.api_key}"
         }
         
         # Simple in-memory cache
@@ -51,7 +50,7 @@ class SallingAPIClient:
     def fetch_campaigns(
         self, 
         location: Location, 
-        radius_km: float = 20.0
+        radius_km: float = 2.0
     ) -> List[DiscountItem]:
         """
         Fetch discount campaigns from Salling Group API.
@@ -72,16 +71,16 @@ class SallingAPIClient:
             return cached_data
         
         try:
-            # Salling API uses meters for radius
-            radius_meters = int(radius_km * 1000)
+            # Salling API uses kilometers for radius (max 100km, default 2km)
+            radius_km_capped = min(radius_km, 100.0)
             
-            # API endpoint for food offers
-            url = f"{self.BASE_URL}/food-waste"
+            # API endpoint for food waste offers
+            url = f"{self.BASE_URL}/food-waste/"
             
+            # Salling API expects geo parameter in format "latitude,longitude"
             params = {
-                "lat": location.latitude,
-                "lng": location.longitude,
-                "radius": radius_meters
+                "geo": f"{location.latitude},{location.longitude}",
+                "radius": radius_km_capped
             }
             
             response = requests.get(
@@ -95,10 +94,15 @@ class SallingAPIClient:
             if response.status_code == 429:
                 raise requests.RequestException("API rate limit exceeded. Please try again later.")
             
+            # Debug: print response for bad requests
+            if response.status_code >= 400:
+                print(f"API Error Response: {response.text}")
+            
             response.raise_for_status()
             
             # Parse the response
-            campaigns = self.parse_campaign_response(response.json())
+            json_data = response.json()
+            campaigns = self.parse_campaign_response(json_data)
             
             # Cache the results
             self.cache_campaigns(campaigns)
@@ -116,18 +120,6 @@ class SallingAPIClient:
         
         The Salling API returns food waste offers with the following structure:
         {
-            "product": {
-                "description": "Product name",
-                "ean": "product code"
-            },
-            "offer": {
-                "originalPrice": 100.0,
-                "newPrice": 50.0,
-                "percentDiscount": 50,
-                "stock": 5,
-                "stockUnit": "kg",
-                "lastUpdate": "2025-11-12T10:00:00Z"
-            },
             "store": {
                 "name": "Netto",
                 "address": {
@@ -138,9 +130,22 @@ class SallingAPIClient:
                 "coordinates": [12.5683, 55.6761],
                 "brand": "netto"
             },
-            "clearance": {
-                "endTime": "2025-11-15T20:00:00Z"
-            }
+            "clearances": [
+                {
+                    "product": {
+                        "description": "Product name",
+                        "ean": "product code"
+                    },
+                    "offer": {
+                        "originalPrice": 100.0,
+                        "newPrice": 50.0,
+                        "percentDiscount": 50,
+                        "stock": 5,
+                        "stockUnit": "kg",
+                        "endTime": "2025-11-15T20:00:00Z"
+                    }
+                }
+            ]
         }
         
         Args:
@@ -151,22 +156,14 @@ class SallingAPIClient:
         """
         discount_items = []
         
-        for item in json_data:
+        for store_data in json_data:
             try:
-                # Extract product information
-                product = item.get("product", {})
-                product_name = product.get("description", "Unknown Product")
-                
-                # Extract offer information
-                offer = item.get("offer", {})
-                original_price = offer.get("originalPrice", 0.0)
-                discount_price = offer.get("newPrice", 0.0)
-                discount_percent = offer.get("percentDiscount", 0)
-                
                 # Extract store information
-                store = item.get("store", {})
+                store = store_data.get("store", {})
                 store_name = store.get("name", "Unknown Store")
-                brand = store.get("brand", "").lower()
+                store_address = store.get("address", {})
+                store_city = store_address.get("city", "")
+                store_street = store_address.get("street", "")
                 
                 # Get store coordinates
                 coordinates = store.get("coordinates", [])
@@ -177,45 +174,70 @@ class SallingAPIClient:
                         longitude=coordinates[0]
                     )
                 else:
-                    # Skip items without valid coordinates
+                    # Skip stores without valid coordinates
                     continue
                 
-                # Extract clearance/expiration information
-                clearance = item.get("clearance", {})
-                end_time_str = clearance.get("endTime")
+                # Process each clearance item at this store
+                clearances = store_data.get("clearances", [])
                 
-                if end_time_str:
-                    # Parse ISO format datetime
-                    end_time = datetime.fromisoformat(end_time_str.replace("Z", "+00:00"))
-                    expiration_date = end_time.date()
-                else:
-                    # Default to 3 days from now if no expiration
-                    expiration_date = date.today() + timedelta(days=3)
-                
-                # Determine if product is organic
-                # Check for Danish organic keywords in product name
-                is_organic = any(
-                    keyword in product_name.lower() 
-                    for keyword in ["økologisk", "organic", "øko", "bio"]
-                )
-                
-                # Create DiscountItem
-                discount_item = DiscountItem(
-                    product_name=product_name,
-                    store_name=f"{store_name} {store.get('address', {}).get('city', '')}".strip(),
-                    store_location=store_location,
-                    original_price=original_price,
-                    discount_price=discount_price,
-                    discount_percent=discount_percent,
-                    expiration_date=expiration_date,
-                    is_organic=is_organic
-                )
-                
-                discount_items.append(discount_item)
+                for clearance in clearances:
+                    try:
+                        # Extract product information
+                        product = clearance.get("product", {})
+                        product_name = product.get("description", "Unknown Product")
+                        
+                        # Extract offer information
+                        offer = clearance.get("offer", {})
+                        original_price = offer.get("originalPrice", 0.0)
+                        discount_price = offer.get("newPrice", 0.0)
+                        discount_percent = offer.get("percentDiscount", 0)
+                        
+                        # Extract expiration information
+                        end_time_str = offer.get("endTime")
+                        
+                        if end_time_str:
+                            # Parse ISO format datetime
+                            end_time = datetime.fromisoformat(end_time_str.replace("Z", "+00:00"))
+                            expiration_date = end_time.date()
+                        else:
+                            # Default to 3 days from now if no expiration
+                            expiration_date = date.today() + timedelta(days=3)
+                        
+                        # Determine if product is organic
+                        # Check for Danish organic keywords in product name
+                        is_organic = any(
+                            keyword in product_name.lower() 
+                            for keyword in ["økologisk", "organic", "øko", "bio"]
+                        )
+                        
+                        # Create full store address
+                        full_address = f"{store_street}, {store_city}".strip(", ")
+                        
+                        # Create DiscountItem
+                        discount_item = DiscountItem(
+                            product_name=product_name,
+                            store_name=f"{store_name} {store_city}".strip(),
+                            store_location=store_location,
+                            original_price=original_price,
+                            discount_price=discount_price,
+                            discount_percent=discount_percent,
+                            expiration_date=expiration_date,
+                            is_organic=is_organic,
+                            store_address=full_address,
+                            travel_distance_km=0.0,  # Will be calculated later by Google Maps
+                            travel_time_minutes=0.0  # Will be calculated later by Google Maps
+                        )
+                        
+                        discount_items.append(discount_item)
+                        
+                    except (KeyError, ValueError, TypeError) as e:
+                        # Skip malformed clearance items but continue processing
+                        print(f"Warning: Failed to parse clearance item: {e}")
+                        continue
                 
             except (KeyError, ValueError, TypeError) as e:
-                # Skip malformed items but continue processing
-                print(f"Warning: Failed to parse discount item: {e}")
+                # Skip malformed store data but continue processing
+                print(f"Warning: Failed to parse store data: {e}")
                 continue
         
         return discount_items
