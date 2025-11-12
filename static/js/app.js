@@ -7,6 +7,72 @@ document.addEventListener('DOMContentLoaded', function() {
     const resultsSection = document.getElementById('results-section');
     const errorMessage = document.getElementById('error-message');
     const errorText = document.getElementById('error-text');
+    const getLocationBtn = document.getElementById('get-location-btn');
+    const locationInput = document.getElementById('location');
+    
+    // Slider elements
+    const costSlider = document.getElementById('pref-cost');
+    const timeSlider = document.getElementById('pref-time');
+    const qualitySlider = document.getElementById('pref-quality');
+    const costValue = document.getElementById('cost-value');
+    const timeValue = document.getElementById('time-value');
+    const qualityValue = document.getElementById('quality-value');
+
+    // Update slider value displays with one decimal place
+    costSlider.addEventListener('input', function() {
+        costValue.textContent = parseFloat(this.value).toFixed(1);
+    });
+    
+    timeSlider.addEventListener('input', function() {
+        timeValue.textContent = parseFloat(this.value).toFixed(1);
+    });
+    
+    qualitySlider.addEventListener('input', function() {
+        qualityValue.textContent = parseFloat(this.value).toFixed(1);
+    });
+
+    // Geolocation button handler
+    getLocationBtn.addEventListener('click', function() {
+        if (!navigator.geolocation) {
+            showError('Geolocation is not supported by your browser');
+            return;
+        }
+
+        // Disable button and show loading state
+        getLocationBtn.disabled = true;
+        getLocationBtn.textContent = '⏳';
+
+        navigator.geolocation.getCurrentPosition(
+            function(position) {
+                const lat = position.coords.latitude.toFixed(4);
+                const lon = position.coords.longitude.toFixed(4);
+                locationInput.value = `${lat},${lon}`;
+                
+                // Reset button
+                getLocationBtn.disabled = false;
+                getLocationBtn.textContent = '📍';
+            },
+            function(error) {
+                let errorMsg = 'Unable to get your location';
+                switch(error.code) {
+                    case error.PERMISSION_DENIED:
+                        errorMsg = 'Location permission denied. Please enable location access.';
+                        break;
+                    case error.POSITION_UNAVAILABLE:
+                        errorMsg = 'Location information unavailable';
+                        break;
+                    case error.TIMEOUT:
+                        errorMsg = 'Location request timed out';
+                        break;
+                }
+                showError(errorMsg);
+                
+                // Reset button
+                getLocationBtn.disabled = false;
+                getLocationBtn.textContent = '📍';
+            }
+        );
+    });
 
     // Form submission handler
     form.addEventListener('submit', function(e) {
@@ -36,20 +102,20 @@ document.addEventListener('DOMContentLoaded', function() {
     function validateForm() {
         const location = document.getElementById('location').value.trim();
         const mealPlan = document.getElementById('meal-plan').value.trim();
-        const preferences = document.querySelectorAll('input[name="preferences"]:checked');
+        const costValue = parseFloat(costSlider.value);
+        const timeValue = parseFloat(timeSlider.value);
+        const qualityValue = parseFloat(qualitySlider.value);
 
         if (!location) {
             showError('Please enter a location');
             return false;
         }
 
-        if (!mealPlan) {
-            showError('Please enter at least one meal in your meal plan');
-            return false;
-        }
+        // Meal plan is now optional - AI will suggest if empty
+        // No validation needed for meal plan
 
-        if (preferences.length === 0) {
-            showError('Please select at least one optimization preference');
+        if (costValue === 0 && timeValue === 0 && qualityValue === 0) {
+            showError('Please set at least one optimization preference above 0');
             return false;
         }
 
@@ -62,21 +128,38 @@ document.addEventListener('DOMContentLoaded', function() {
     function getFormData() {
         const location = document.getElementById('location').value.trim();
         const mealPlan = document.getElementById('meal-plan').value.trim();
-        const preferences = Array.from(document.querySelectorAll('input[name="preferences"]:checked'))
-            .map(cb => cb.value);
+        const costValue = parseFloat(costSlider.value);
+        const timeValue = parseFloat(timeSlider.value);
+        const qualityValue = parseFloat(qualitySlider.value);
 
-        // Parse meal plan into array
-        const meals = mealPlan.split('\n')
-            .map(meal => meal.trim())
-            .filter(meal => meal.length > 0);
+        // Parse meal plan into array (or send as single preference string)
+        let meals = [];
+        if (mealPlan) {
+            // Check if it's a description or a list
+            if (mealPlan.includes('\n')) {
+                // Multiple lines - treat as meal list
+                meals = mealPlan.split('\n')
+                    .map(meal => meal.trim())
+                    .filter(meal => meal.length > 0);
+            } else {
+                // Single line - could be preference or single meal
+                meals = [mealPlan.trim()];
+            }
+        }
+        // If empty, AI will suggest meals based on discounts
 
         return {
             location: location,
             meals: meals,
             preferences: {
-                maximize_savings: preferences.includes('cost'),
-                minimize_stores: preferences.includes('time'),
-                prefer_organic: preferences.includes('quality')
+                maximize_savings: costValue > 0,
+                minimize_stores: timeValue > 0,
+                prefer_organic: qualityValue > 0
+            },
+            preference_weights: {
+                cost: costValue,
+                time: timeValue,
+                quality: qualityValue
             }
         };
     }

@@ -75,6 +75,42 @@ main {
     transition: border-color 0.3s ease;
 }
 
+.location-input-group {
+    display: flex;
+    gap: 10px;
+    align-items: stretch;
+}
+
+.location-input-group input {
+    flex: 1;
+}
+
+.btn-location {
+    padding: 12px 20px;
+    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    color: white;
+    border: none;
+    border-radius: 8px;
+    font-size: 1.3rem;
+    cursor: pointer;
+    transition: transform 0.2s ease, box-shadow 0.2s ease;
+    min-width: 60px;
+}
+
+.btn-location:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 5px 15px rgba(102, 126, 234, 0.4);
+}
+
+.btn-location:active {
+    transform: translateY(0);
+}
+
+.btn-location:disabled {
+    opacity: 0.6;
+    cursor: not-allowed;
+}
+
 .form-group input[type="text"]:focus,
 .form-group textarea:focus {
     outline: none;
@@ -93,40 +129,143 @@ main {
     font-size: 0.875rem;
 }
 
-/* Checkbox Group */
-.checkbox-group {
+/* Slider Group */
+.slider-group {
     display: flex;
     flex-direction: column;
-    gap: 12px;
-    margin-top: 10px;
+    gap: 20px;
+    margin-top: 15px;
 }
 
-.checkbox-label {
-    display: flex;
-    align-items: center;
-    padding: 12px 15px;
+.slider-item {
+    padding: 15px;
     background: #f8f9fa;
     border: 2px solid #e0e0e0;
     border-radius: 8px;
-    cursor: pointer;
-    transition: all 0.3s ease;
+    transition: border-color 0.3s ease;
 }
 
-.checkbox-label:hover {
-    background: #f0f0f0;
+.slider-item:hover {
     border-color: #667eea;
 }
 
-.checkbox-label input[type="checkbox"] {
-    width: 20px;
-    height: 20px;
-    margin-right: 12px;
-    cursor: pointer;
+.slider-header {
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    gap: 15px;
+    margin-bottom: 12px;
 }
 
-.checkbox-label span {
+.slider-label {
     font-size: 1rem;
     font-weight: 500;
+    color: #333;
+}
+
+.slider-value {
+    font-size: 1.3rem;
+    font-weight: 700;
+    color: #667eea;
+    min-width: 28px;
+    text-align: center;
+    background: white;
+    padding: 4px 10px;
+    border-radius: 6px;
+    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+    transition: transform 0.15s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+/* Slider Input - Base Styles */
+.slider {
+    width: 100%;
+    height: 8px;
+    border-radius: 5px;
+    background: linear-gradient(to right, #e0e0e0 0%, #667eea 100%);
+    outline: none;
+    cursor: pointer;
+    -webkit-appearance: none;
+    -moz-appearance: none;
+    appearance: none;
+}
+
+/* Webkit (Chrome, Safari, Edge) - Track */
+.slider::-webkit-slider-runnable-track {
+    width: 100%;
+    height: 8px;
+    border-radius: 5px;
+    background: transparent;
+}
+
+/* Webkit (Chrome, Safari, Edge) - Thumb */
+.slider::-webkit-slider-thumb {
+    -webkit-appearance: none;
+    appearance: none;
+    width: 24px;
+    height: 24px;
+    border-radius: 50%;
+    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    border: 3px solid white;
+    box-shadow: 0 2px 8px rgba(102, 126, 234, 0.5);
+    cursor: grab;
+    margin-top: -8px; /* Centers thumb vertically: (thumb_height - track_height) / 2 = (24 - 8) / 2 = 8px */
+    transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.slider::-webkit-slider-thumb:hover {
+    transform: scale(1.2);
+    box-shadow: 0 4px 12px rgba(102, 126, 234, 0.7);
+}
+
+.slider::-webkit-slider-thumb:active {
+    cursor: grabbing;
+    transform: scale(1.1);
+    transition: all 0.1s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+/* Firefox - Track */
+.slider::-moz-range-track {
+    width: 100%;
+    height: 8px;
+    border-radius: 5px;
+    background: transparent;
+    border: none;
+}
+
+/* Firefox - Thumb */
+.slider::-moz-range-thumb {
+    width: 24px;
+    height: 24px;
+    border-radius: 50%;
+    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    border: 3px solid white;
+    box-shadow: 0 2px 8px rgba(102, 126, 234, 0.5);
+    cursor: grab;
+    transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.slider::-moz-range-thumb:hover {
+    transform: scale(1.2);
+    box-shadow: 0 4px 12px rgba(102, 126, 234, 0.7);
+}
+
+.slider::-moz-range-thumb:active {
+    cursor: grabbing;
+    transform: scale(1.1);
+    transition: all 0.1s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+/* Focus state for accessibility */
+.slider:focus {
+    outline: none;
+}
+
+.slider:focus::-webkit-slider-thumb {
+    box-shadow: 0 0 0 4px rgba(102, 126, 234, 0.2), 0 2px 8px rgba(102, 126, 234, 0.5);
+}
+
+.slider:focus::-moz-range-thumb {
+    box-shadow: 0 0 0 4px rgba(102, 126, 234, 0.2), 0 2px 8px rgba(102, 126, 234, 0.5);
 }
 
 /* Button */

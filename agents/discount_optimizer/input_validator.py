@@ -91,29 +91,24 @@ class InputValidator:
     
     def _validate_meal_plan(self, meal_plan: Any) -> List[str]:
         """
-        Validate meal plan is a non-empty list.
+        Validate meal plan - now optional (AI will suggest if empty).
         
         Args:
             meal_plan: Meal plan data (should be a list of strings)
             
         Returns:
-            List[str]: Validated meal plan
+            List[str]: Validated meal plan (can be empty for AI suggestions)
             
         Raises:
-            ValidationError: If meal plan is invalid
+            ValidationError: If meal plan format is invalid
         """
         if not isinstance(meal_plan, list):
             raise ValidationError("Meal plan must be a list")
         
-        if not self.validate_meal_plan(meal_plan):
-            raise ValidationError("Meal plan cannot be empty")
-        
         # Filter out empty strings and strip whitespace
         cleaned_meals = [meal.strip() for meal in meal_plan if isinstance(meal, str) and meal.strip()]
         
-        if not cleaned_meals:
-            raise ValidationError("Meal plan must contain at least one valid meal")
-        
+        # Empty meal plan is now OK - AI will suggest meals
         return cleaned_meals
     
     def validate_meal_plan(self, meals: List[str]) -> bool:

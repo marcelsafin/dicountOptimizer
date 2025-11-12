@@ -9,7 +9,7 @@
 <body>
     <div class="container">
         <header>
-            <h1>🛒 Shopping Optimizer</h1>
+            <h1>Shopping Optimizer</h1>
             <p class="subtitle">Get the best deals for your meal plan</p>
         </header>
 
@@ -18,43 +18,56 @@
                 <form id="optimizer-form">
                     <div class="form-group">
                         <label for="location">Location</label>
-                        <input 
-                            type="text" 
-                            id="location" 
-                            name="location" 
-                            placeholder="e.g., Copenhagen or 55.6761,12.5683"
-                            required
-                        >
+                        <div class="location-input-group">
+                            <input 
+                                type="text" 
+                                id="location" 
+                                name="location" 
+                                placeholder="e.g., Copenhagen or 55.6761,12.5683"
+                                required
+                            >
+                            <button type="button" class="btn-location" id="get-location-btn" title="Use my current location">
+                                📍
+                            </button>
+                        </div>
                         <small>Enter city name or coordinates (latitude, longitude)</small>
                     </div>
 
                     <div class="form-group">
-                        <label for="meal-plan">Meal Plan</label>
+                        <label for="meal-plan">What do you want to eat?</label>
                         <textarea 
                             id="meal-plan" 
                             name="meal-plan" 
-                            rows="5" 
-                            placeholder="Enter your meals, one per line&#10;e.g.,&#10;Tacos&#10;Pasta&#10;Veggie soup"
-                            required
+                            rows="3" 
+                            placeholder="Describe what you're craving or leave empty for AI suggestions based on current deals...&#10;e.g., 'Something healthy and quick' or 'Comfort food for the weekend'"
                         ></textarea>
-                        <small>List the meals you want to prepare</small>
+                        <small>Describe your preferences or leave empty - AI will suggest meals based on current discounts</small>
                     </div>
 
                     <div class="form-group">
-                        <label>Optimization Preferences</label>
-                        <div class="checkbox-group">
-                            <label class="checkbox-label">
-                                <input type="checkbox" id="pref-cost" name="preferences" value="cost">
-                                <span>💰 Cost - Maximize savings</span>
-                            </label>
-                            <label class="checkbox-label">
-                                <input type="checkbox" id="pref-time" name="preferences" value="time">
-                                <span>⏱️ Time - Minimize stores</span>
-                            </label>
-                            <label class="checkbox-label">
-                                <input type="checkbox" id="pref-quality" name="preferences" value="quality">
-                                <span>🌿 Quality - Prefer organic</span>
-                            </label>
+                        <label>Optimization Preferences (0 = Not Important, 5 = Very Important)</label>
+                        <div class="slider-group">
+                            <div class="slider-item">
+                                <div class="slider-header">
+                                    <span class="slider-label">💰 Cost - Maximize savings</span>
+                                    <span class="slider-value" id="cost-value">0.0</span>
+                                </div>
+                                <input type="range" id="pref-cost" name="cost" min="0" max="5" step="0.1" value="0" class="slider">
+                            </div>
+                            <div class="slider-item">
+                                <div class="slider-header">
+                                    <span class="slider-label">Time - Minimize stores</span>
+                                    <span class="slider-value" id="time-value">0.0</span>
+                                </div>
+                                <input type="range" id="pref-time" name="time" min="0" max="5" step="0.1" value="0" class="slider">
+                            </div>
+                            <div class="slider-item">
+                                <div class="slider-header">
+                                    <span class="slider-label">Quality - Prefer organic</span>
+                                    <span class="slider-value" id="quality-value">0.0</span>
+                                </div>
+                                <input type="range" id="pref-quality" name="quality" min="0" max="5" step="0.1" value="0" class="slider">
+                            </div>
                         </div>
                     </div>
 

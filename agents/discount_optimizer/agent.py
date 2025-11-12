@@ -21,6 +21,7 @@ from .ingredient_mapper import IngredientMapper
 from .multi_criteria_optimizer import MultiCriteriaOptimizer
 from .savings_calculator import SavingsCalculator
 from .output_formatter import OutputFormatter
+from .meal_suggester import MealSuggester
 
 # Load environment variables
 load_dotenv()
@@ -121,12 +122,42 @@ def optimize_shopping(
         }
     
     try:
+        # Stage 2.5: AI Meal Suggestion (if meal plan is empty or vague)
+        meal_plan = user_input.meal_plan
+        
+        if not meal_plan or (len(meal_plan) == 1 and len(meal_plan[0]) < 10):
+            # User wants AI suggestions based on discounts
+            try:
+                suggester = MealSuggester()
+                
+                # Extract product names from valid discounts
+                available_products = list(set([d.product_name for d in valid_discounts]))
+                
+                # Get user preference text (if provided)
+                user_pref = meal_plan[0] if meal_plan else ""
+                
+                # Generate meal suggestions
+                suggested_meals = suggester.suggest_meals(
+                    available_products=available_products,
+                    user_preferences=user_pref,
+                    num_meals=3
+                )
+                
+                meal_plan = suggested_meals
+                print(f"AI suggested meals: {meal_plan}")
+                
+            except Exception as e:
+                print(f"Error generating meal suggestions: {e}")
+                # Continue with original meal plan or default
+                if not meal_plan:
+                    meal_plan = ["taco", "pasta"]
+        
         # Stage 3: Ingredient Mapping
         mapper = IngredientMapper()
         
         # Get all required ingredients for the meal plan
         all_ingredients = []
-        for meal in user_input.meal_plan:
+        for meal in meal_plan:
             ingredients = mapper.get_ingredients_for_meal(meal)
             all_ingredients.extend(ingredients)
         
@@ -136,7 +167,7 @@ def optimize_shopping(
         if not unique_ingredients:
             return {
                 'success': False,
-                'error': f"Could not find ingredient information for meals: {', '.join(user_input.meal_plan)}"
+                'error': f"Could not find ingredient information for meals: {', '.join(meal_plan)}"
             }
         
         # Match products to ingredients
@@ -237,7 +268,7 @@ def optimize_shopping(
 
 # Root agent definition for Google ADK
 root_agent = Agent(
-    model='gemini-2.0-flash-exp',
+    model='gemini-2.5-flash-latest',
     name='shopping_optimizer',
     description="An intelligent shopping assistant that optimizes grocery shopping based on discounts, location, meal plans, and user preferences",
     instruction="""You are a helpful shopping optimization assistant that helps users save money and time on grocery shopping.
