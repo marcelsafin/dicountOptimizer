@@ -82,52 +82,190 @@ document.addEventListener('DOMContentLoaded', function() {
     }
 
     /**
-     * Optimize shopping plan (placeholder - will be implemented in task 10)
+     * Optimize shopping plan by calling the backend API
      */
-    function optimizeShoppingPlan(formData) {
-        // Placeholder: Simulate API call with timeout
-        setTimeout(() => {
-            // This will be replaced with actual ADK agent call in task 10
-            displayPlaceholderResults();
-        }, 1500);
+    async function optimizeShoppingPlan(formData) {
+        try {
+            const response = await fetch('/api/optimize', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify(formData)
+            });
+
+            const result = await response.json();
+
+            if (result.success) {
+                displayResults(result);
+            } else {
+                hideLoading();
+                showError(result.error || 'Optimization failed. Please try again.');
+            }
+        } catch (error) {
+            hideLoading();
+            showError('Failed to connect to the server. Please try again.');
+            console.error('Optimization error:', error);
+        }
     }
 
     /**
-     * Display placeholder results (for UI testing)
+     * Display optimization results
      */
-    function displayPlaceholderResults() {
+    function displayResults(result) {
         hideLoading();
         
-        // Populate shopping list
+        // Parse the recommendation text to extract structured data
+        const recommendation = result.recommendation;
+        
+        // Populate shopping list with formatted recommendation
         const shoppingList = document.getElementById('shopping-list');
-        shoppingList.innerHTML = `
-            <p><em>Shopping recommendations will appear here after optimization...</em></p>
-            <p style="margin-top: 10px; color: #666;">
-                This section will show which products to buy at which stores, organized by day.
-            </p>
-        `;
+        shoppingList.innerHTML = formatRecommendationHTML(recommendation);
 
         // Populate savings
-        document.getElementById('monetary-savings').textContent = 'DKK 0.00';
-        document.getElementById('time-savings').textContent = '0 hours';
+        const totalSavings = result.total_savings || 0;
+        const timeSavings = result.time_savings || 0;
+        
+        document.getElementById('monetary-savings').textContent = `${totalSavings.toFixed(2)} kr`;
+        document.getElementById('time-savings').textContent = `${timeSavings.toFixed(2)} hours`;
 
-        // Populate tips
+        // Extract and populate tips from recommendation
+        const tips = extractTips(recommendation);
         const tipsList = document.getElementById('tips-list');
-        tipsList.innerHTML = `
-            <li>Tips and recommendations will appear here...</li>
-            <li>Time-sensitive discount opportunities will be highlighted</li>
-            <li>Organic product recommendations will be shown</li>
-        `;
+        if (tips.length > 0) {
+            tipsList.innerHTML = tips.map(tip => `<li>${escapeHtml(tip)}</li>`).join('');
+        } else {
+            tipsList.innerHTML = '<li>No specific tips available for this shopping plan.</li>';
+        }
 
-        // Populate motivation message
+        // Extract and populate motivation message
+        const motivation = extractMotivation(recommendation);
         const motivationMessage = document.getElementById('motivation-message');
-        motivationMessage.textContent = 'Your personalized shopping plan will include a motivational message here!';
+        motivationMessage.textContent = motivation || 'Happy shopping! Your optimized plan is ready.';
 
         // Show results section
         resultsSection.style.display = 'block';
         
         // Scroll to results
         resultsSection.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    }
+
+    /**
+     * Format recommendation text as HTML
+     */
+    function formatRecommendationHTML(recommendation) {
+        if (!recommendation) {
+            return '<p>No recommendations available.</p>';
+        }
+
+        // Split by lines and format
+        const lines = recommendation.split('\n');
+        let html = '';
+        let inList = false;
+
+        for (let line of lines) {
+            line = line.trim();
+            if (!line) continue;
+
+            // Check if it's a store/day header (contains emoji or all caps)
+            if (line.match(/^[🏪📅🛒]/) || line.match(/^[A-ZÆØÅ\s]+:/) || line.includes('**')) {
+                if (inList) {
+                    html += '</ul>';
+                    inList = false;
+                }
+                // Remove markdown bold markers
+                line = line.replace(/\*\*/g, '');
+                html += `<h4 style="margin-top: 15px; margin-bottom: 8px; color: #667eea; font-size: 1.1rem;">${escapeHtml(line)}</h4>`;
+            } else if (line.match(/^[-•*]\s/) || line.match(/^\d+\.\s/)) {
+                // It's a list item
+                if (!inList) {
+                    html += '<ul style="list-style: none; padding-left: 0;">';
+                    inList = true;
+                }
+                // Remove list markers
+                line = line.replace(/^[-•*]\s/, '').replace(/^\d+\.\s/, '');
+                html += `<li style="padding: 8px 0; padding-left: 20px; position: relative;">
+                    <span style="position: absolute; left: 0; color: #667eea;">→</span>
+                    ${escapeHtml(line)}
+                </li>`;
+            } else if (!line.includes('Tips:') && !line.includes('Motivation:')) {
+                // Regular paragraph (skip tips and motivation sections as they're shown separately)
+                if (inList) {
+                    html += '</ul>';
+                    inList = false;
+                }
+                html += `<p style="margin: 8px 0;">${escapeHtml(line)}</p>`;
+            }
+        }
+
+        if (inList) {
+            html += '</ul>';
+        }
+
+        return html || '<p>No shopping list available.</p>';
+    }
+
+    /**
+     * Extract tips from recommendation text
+     */
+    function extractTips(recommendation) {
+        const tips = [];
+        const lines = recommendation.split('\n');
+        let inTipsSection = false;
+
+        for (let line of lines) {
+            line = line.trim();
+            
+            if (line.includes('Tips:') || line.includes('💡')) {
+                inTipsSection = true;
+                continue;
+            }
+            
+            if (inTipsSection) {
+                if (line.includes('Motivation:') || line.includes('🎉')) {
+                    break;
+                }
+                if (line.match(/^[-•*]\s/) || line.match(/^\d+\.\s/)) {
+                    const tip = line.replace(/^[-•*]\s/, '').replace(/^\d+\.\s/, '').trim();
+                    if (tip) tips.push(tip);
+                }
+            }
+        }
+
+        return tips;
+    }
+
+    /**
+     * Extract motivation message from recommendation text
+     */
+    function extractMotivation(recommendation) {
+        const lines = recommendation.split('\n');
+        let inMotivationSection = false;
+        let motivation = '';
+
+        for (let line of lines) {
+            line = line.trim();
+            
+            if (line.includes('Motivation:') || line.includes('🎉')) {
+                inMotivationSection = true;
+                continue;
+            }
+            
+            if (inMotivationSection && line) {
+                motivation += line + ' ';
+            }
+        }
+
+        return motivation.trim();
+    }
+
+    /**
+     * Escape HTML to prevent XSS
+     */
+    function escapeHtml(text) {
+        const div = document.createElement('div');
+        div.textContent = text;
+        return div.innerHTML;
     }
 
     /**

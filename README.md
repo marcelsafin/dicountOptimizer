@@ -31,15 +31,24 @@ GOOGLE_API_KEY=din_riktiga_api_nyckel_här
 
 ## Kör agenten
 
+### Web UI (rekommenderat)
+
 ```bash
-# Web UI (rekommenderat)
-adk web --port 8000
+# Starta Flask web server
+python app.py
+```
+
+Öppna sedan din webbläsare på: http://127.0.0.1:8000
+
+### Alternativa sätt
+
+```bash
+# ADK Web UI
+adk web --port 8001
 
 # CLI mode
 adk run discount_optimizer
 ```
-
-Öppna sedan din webbläsare på: http://127.0.0.1:8000
 
 ## Exempel på användning
 
