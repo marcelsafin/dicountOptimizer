@@ -7,28 +7,28 @@
   - Create meal-to-ingredients mapping database
   - _Requirements: 1.1, 1.2, 1.3, 1.4, 2.1_
 
-- [-] 2. Implement InputValidator component
+- [x] 2. Implement InputValidator component
   - Write validation function for location coordinates (latitude -90 to 90, longitude -180 to 180)
   - Write validation function for meal plan (non-empty list)
   - Write timeframe parser to convert "this week" to date range
   - Write validation to ensure at least one preference is selected
   - _Requirements: 1.5_
 
-- [ ] 3. Implement DiscountMatcher component
+- [x] 3. Implement DiscountMatcher component
   - Write Haversine formula function for distance calculation between two coordinates
   - Write filter_by_location function to filter discounts within max_distance_km radius
   - Write filter_by_timeframe function to exclude expired discounts
   - Write load_discounts function to return mock discount data
   - _Requirements: 2.1, 2.3, 2.4_
 
-- [ ] 4. Implement IngredientMapper component
+- [x] 4. Implement IngredientMapper component
   - Write get_ingredients_for_meal function using meal database lookup
   - Write fuzzy_match function for ingredient-to-product matching
   - Write match_products_to_ingredients function to find all discount options per ingredient
   - Handle case when no matching products found for an ingredient
   - _Requirements: 2.2, 3.1, 3.2, 3.3, 3.4_
 
-- [ ] 5. Implement MultiCriteriaOptimizer component
+- [x] 5. Implement MultiCriteriaOptimizer component
   - Write calculate_score function with weighted scoring algorithm
   - Implement savings score calculation: (original_price - discount_price) / original_price
   - Implement distance score calculation: 1 / (1 + distance_km)

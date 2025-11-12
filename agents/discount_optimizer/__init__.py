@@ -9,6 +9,9 @@ from .models import (
     MOCK_DISCOUNTS, MEAL_INGREDIENTS
 )
 from .input_validator import InputValidator, ValidationError
+from .discount_matcher import DiscountMatcher
+from .ingredient_mapper import IngredientMapper
+from .multi_criteria_optimizer import MultiCriteriaOptimizer
 
 __all__ = [
     'root_agent',
@@ -26,4 +29,7 @@ __all__ = [
     'MEAL_INGREDIENTS',
     'InputValidator',
     'ValidationError',
+    'DiscountMatcher',
+    'IngredientMapper',
+    'MultiCriteriaOptimizer',
 ]
