@@ -4,27 +4,13 @@ Discount Optimizer Agent - Optimerar matinköp baserat på erbjudanden och prefe
 
 from typing import List, Dict, Any
 import json
+import os
+from dotenv import load_dotenv
+from google.adk.agents.llm_agent import Agent
+from .models import MOCK_DISCOUNTS, MEAL_INGREDIENTS
 
-
-# Mock data för tester
-MOCK_DISCOUNTS = {
-    "Stockholm": [
-        {"store": "ICA Maxi", "product": "Tortillas", "original_price": 25, "discount_price": 18, "discount_percent": 28},
-        {"store": "Coop", "product": "Köttfärs", "original_price": 89, "discount_price": 69, "discount_percent": 22},
-        {"store": "Willys", "product": "Tomatpuré", "original_price": 15, "discount_price": 10, "discount_percent": 33},
-        {"store": "ICA Maxi", "product": "Ost", "original_price": 45, "discount_price": 35, "discount_percent": 22},
-        {"store": "Coop", "product": "Gräddfil", "original_price": 22, "discount_price": 16, "discount_percent": 27},
-    ],
-    "Göteborg": [
-        {"store": "Willys", "product": "Tortillas", "original_price": 25, "discount_price": 20, "discount_percent": 20},
-        {"store": "ICA", "product": "Köttfärs", "original_price": 89, "discount_price": 65, "discount_percent": 27},
-        {"store": "Coop", "product": "Salsa", "original_price": 30, "discount_price": 22, "discount_percent": 27},
-    ],
-    "Malmö": [
-        {"store": "Hemköp", "product": "Tortillas", "original_price": 25, "discount_price": 19, "discount_percent": 24},
-        {"store": "Willys", "product": "Köttfärs", "original_price": 89, "discount_price": 70, "discount_percent": 21},
-    ]
-}
+# Ladda environment variables från .env
+load_dotenv()
 
 
 def get_discounts_by_location(location: str) -> List[Dict[str, Any]]:
@@ -32,13 +18,25 @@ def get_discounts_by_location(location: str) -> List[Dict[str, Any]]:
     Hämtar aktuella erbjudanden baserat på användarens plats.
     
     Args:
-        location: Stad eller område där användaren vill handla
+        location: Stad eller område där användaren vill handla (t.ex. "Köpenhamn", "Copenhagen")
         
     Returns:
-        Lista med erbjudanden i området
+        Lista med erbjudanden i området som dictionaries
     """
-    discounts = MOCK_DISCOUNTS.get(location, [])
-    return discounts
+    # Konvertera DiscountItem objekt till dictionaries
+    discounts_list = []
+    for discount in MOCK_DISCOUNTS:
+        discounts_list.append({
+            "store": discount.store_name,
+            "product": discount.product_name,
+            "original_price": discount.original_price,
+            "discount_price": discount.discount_price,
+            "discount_percent": discount.discount_percent,
+            "is_organic": discount.is_organic,
+            "expiration_date": discount.expiration_date.isoformat()
+        })
+    
+    return discounts_list
 
 
 def filter_products_by_preferences(
@@ -72,15 +70,15 @@ def filter_products_by_preferences(
 def optimize_shopping_plan(
     location: str,
     meal_type: str,
-    preferences: List[str] = None
+    preferences: List[str] | None = None
 ) -> Dict[str, Any]:
     """
     Skapar en optimerad inköpsplan baserat på plats, måltidstyp och preferenser.
     
     Args:
-        location: Stad där användaren vill handla
-        meal_type: Typ av måltid (t.ex. "tacos", "pasta", "sallad")
-        preferences: Valfria preferenser eller restriktioner
+        location: Stad där användaren vill handla (t.ex. "Köpenhamn", "Copenhagen")
+        meal_type: Typ av måltid (t.ex. "tacos", "pasta", "grøntsagssuppe")
+        preferences: Valfria preferenser eller restriktioner (t.ex. ["ekologisk", "billig"])
         
     Returns:
         Optimerad inköpsplan med butiker, produkter och besparingar
@@ -95,14 +93,19 @@ def optimize_shopping_plan(
             "plan": []
         }
     
-    # Filtrera baserat på måltidstyp
-    meal_keywords = {
-        "tacos": ["tortillas", "köttfärs", "ost", "gräddfil", "salsa", "tomatpuré"],
-        "pasta": ["pasta", "köttfärs", "tomatpuré", "ost", "grädde"],
-        "sallad": ["sallad", "tomat", "gurka", "ost", "dressing"]
-    }
+    # Hämta ingredienser från MEAL_INGREDIENTS databasen
+    keywords = MEAL_INGREDIENTS.get(meal_type.lower(), [])
     
-    keywords = meal_keywords.get(meal_type.lower(), [])
+    # Om måltidstypen inte finns, försök hitta liknande
+    if not keywords:
+        # Fallback till gamla keywords
+        meal_keywords_fallback = {
+            "tacos": ["tortillas", "köttfärs", "ost", "gräddfil", "salsa", "tomatpuré"],
+            "pasta": ["pasta", "köttfärs", "tomatpuré", "ost", "grädde"],
+            "sallad": ["sallad", "tomat", "gurka", "ost", "dressing"]
+        }
+        keywords = meal_keywords_fallback.get(meal_type.lower(), [])
+    
     if preferences:
         keywords.extend(preferences)
     
@@ -143,25 +146,25 @@ def optimize_shopping_plan(
 
 
 # Root agent definition (för ADK)
-def root_agent():
-    """
-    Huvudagent som optimerar matinköp utifrån erbjudanden, användarens plats och preferenser.
+root_agent = Agent(
+    model='gemini-2.0-flash-exp',
+    name='discount_optimizer',
+    description="En hjälpsam agent som optimerar matinköp utifrån erbjudanden, användarens plats och preferenser",
+    instruction="""Du är en hjälpsam shoppingassistent som hjälper användare att optimera sina matinköp.
     
-    Agenten kan:
-    - Hitta bästa erbjudanden i din stad
-    - Föreslå optimerade inköpsplaner för olika måltider
+    Du kan:
+    - Hitta bästa erbjudanden i olika svenska städer
+    - Föreslå optimerade inköpsplaner för olika måltider (tacos, pasta, sallad)
     - Beräkna potentiella besparingar
-    - Rekommendera vilken butik du ska handla i
-    """
-    return {
-        "name": "discount_optimizer",
-        "description": "En hjälpsam agent som optimerar matinköp utifrån erbjudanden, användarens plats och preferenser",
-        "tools": [
-            get_discounts_by_location,
-            filter_products_by_preferences,
-            optimize_shopping_plan
-        ]
-    }
+    - Rekommendera vilken butik användaren ska handla i
+    
+    Använd verktygen för att hjälpa användaren hitta de bästa erbjudandena!""",
+    tools=[
+        get_discounts_by_location,
+        filter_products_by_preferences,
+        optimize_shopping_plan
+    ]
+)
 
 
 # Test-funktion

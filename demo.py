@@ -3,7 +3,7 @@ Demo script för Discount Optimizer Agent
 Kör detta för att se agenten i action!
 """
 
-from agent import optimize_shopping_plan, get_discounts_by_location
+from agents.discount_optimizer.agent import optimize_shopping_plan, get_discounts_by_location
 
 
 def demo_basic():
@@ -13,10 +13,10 @@ def demo_basic():
     print("=" * 60)
     print()
     
-    # Scenario 1: Tacos i Stockholm
-    print("📍 Scenario 1: Tacos i Stockholm")
+    # Scenario 1: Tacos i Köpenhamn
+    print("📍 Scenario 1: Tacos i Köpenhamn")
     print("-" * 60)
-    result = optimize_shopping_plan("Stockholm", "tacos")
+    result = optimize_shopping_plan("Köpenhamn", "tacos")
     
     if result['success']:
         print(f"✅ {result['recommendation']}")
@@ -32,19 +32,17 @@ def demo_basic():
                 print(f"   • {product['product']}: {product['discount_price']} kr (spara {savings} kr, -{product['discount_percent']}%)")
             print()
     
-    # Scenario 2: Jämför olika städer
-    print("📍 Scenario 2: Jämför erbjudanden i olika städer")
+    # Scenario 2: Visa alla erbjudanden
+    print("📍 Scenario 2: Alla erbjudanden i Köpenhamn")
     print("-" * 60)
     
-    cities = ["Stockholm", "Göteborg", "Malmö"]
-    for city in cities:
-        discounts = get_discounts_by_location(city)
-        total_discount = sum(d['original_price'] - d['discount_price'] for d in discounts)
-        print(f"{city}: {len(discounts)} erbjudanden, upp till {total_discount} kr i besparingar")
+    discounts = get_discounts_by_location("Köpenhamn")
+    total_discount = sum(d['original_price'] - d['discount_price'] for d in discounts)
+    print(f"Köpenhamn: {len(discounts)} erbjudanden, upp till {total_discount:.0f} kr i besparingar")
     
     print()
     print("=" * 60)
-    print("Demo klar! Testa själv med: python agent.py")
+    print("Demo klar! Starta agenten med: adk web --port 8000")
     print("=" * 60)
 
 
