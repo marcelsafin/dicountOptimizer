@@ -14,6 +14,7 @@ from .ingredient_mapper import IngredientMapper
 from .multi_criteria_optimizer import MultiCriteriaOptimizer
 from .savings_calculator import SavingsCalculator
 from .output_formatter import OutputFormatter
+from .google_maps_service import GoogleMapsService
 
 __all__ = [
     'root_agent',
@@ -34,4 +35,5 @@ __all__ = [
     'MultiCriteriaOptimizer',
     'SavingsCalculator',
     'OutputFormatter',
+    'GoogleMapsService',
 ]

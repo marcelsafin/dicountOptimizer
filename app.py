@@ -6,6 +6,48 @@ Serves the frontend and provides API endpoint for optimization.
 from flask import Flask, render_template, request, jsonify
 from agents.discount_optimizer.agent import optimize_shopping
 import os
+from dotenv import load_dotenv
+import sys
+
+# Load environment variables from .env file
+load_dotenv()
+
+# Validate required API credentials on startup
+def validate_api_configuration():
+    """
+    Validate that all required API credentials are configured.
+    Exits the application if critical credentials are missing.
+    """
+    required_vars = {
+        'SALLING_GROUP_API_KEY': 'Salling Group API key',
+        'GOOGLE_MAPS_API_KEY': 'Google Maps API key',
+        'GEMINI_API_KEY': 'Gemini API key',
+        'GMAIL_CREDENTIALS_PATH': 'Gmail credentials path'
+    }
+    
+    missing_vars = []
+    for var, description in required_vars.items():
+        value = os.getenv(var)
+        if not value or value.startswith('your_'):
+            missing_vars.append(f"  - {var} ({description})")
+    
+    if missing_vars:
+        print("ERROR: Missing required API configuration!", file=sys.stderr)
+        print("Please set the following environment variables in your .env file:", file=sys.stderr)
+        print("\n".join(missing_vars), file=sys.stderr)
+        print("\nRefer to .env.example for the required format.", file=sys.stderr)
+        sys.exit(1)
+    
+    # Validate Gmail credentials file exists
+    gmail_creds_path = os.getenv('GMAIL_CREDENTIALS_PATH')
+    if not os.path.exists(gmail_creds_path):
+        print(f"WARNING: Gmail credentials file not found at {gmail_creds_path}", file=sys.stderr)
+        print("Email campaign parsing will not be available until credentials are configured.", file=sys.stderr)
+    
+    print("✓ API configuration validated successfully")
+
+# Validate configuration on startup
+validate_api_configuration()
 
 app = Flask(__name__)
 

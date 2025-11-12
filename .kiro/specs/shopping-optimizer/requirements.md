@@ -2,17 +2,19 @@
 
 ## Introduction
 
-The Shopping Optimizer is an intelligent agent system that analyzes grocery store discounts, user meal plans, and preferences to generate optimized shopping recommendations. The system matches available discounts to meal requirements while optimizing for savings, convenience (number of stores), and quality preferences (e.g., organic products). It provides actionable recommendations including which products to buy, where to buy them, when to shop, and calculates both monetary and time savings.
+The Shopping Optimizer is an intelligent agent system that analyzes grocery store discounts from eTilbudsavis API, user meal plans, and preferences to generate optimized shopping recommendations. The system uses Google Maps API for geolocation and store proximity, matches available discounts to meal requirements while optimizing for savings, convenience (number of stores), and quality preferences (e.g., organic products). It provides actionable recommendations including which products to buy, where to buy them, when to shop, and calculates both monetary and time savings.
 
 ## Glossary
 
 - **Shopping Optimizer**: The intelligent agent system that processes user inputs and generates optimized shopping recommendations
-- **Discount Data**: Mock data containing product prices, discount information, expiration dates, and store locations from grocery store pamphlets
+- **eTilbudsavis**: Danish digital pamphlet service providing structured JSON API access to current campaigns from all major Danish grocery stores (Netto, Føtex, Rema 1000, Bilka, etc.)
+- **Discount Data**: Real-time product prices, discount information, expiration dates, and store locations from eTilbudsavis API
 - **Meal Plan**: A list of meals the user intends to prepare during a specified timeframe
 - **User Preferences**: Configurable settings including optimization goals (maximize savings, minimize stores, prefer organic) and location
 - **Shopping Recommendation**: The output containing optimized product-store-day combinations with calculated savings
 - **Timeframe**: The period during which the user plans to shop (e.g., "this week")
 - **Store**: A grocery retail location where products can be purchased
+- **Google Maps API**: Service used for geocoding addresses and calculating distances between user location and stores
 
 ## Requirements
 
@@ -30,14 +32,16 @@ The Shopping Optimizer is an intelligent agent system that analyzes grocery stor
 
 ### Requirement 2
 
-**User Story:** As a user, I want the system to search through available grocery store discounts, so that I can find the best deals for my meal plan
+**User Story:** As a user, I want the system to fetch real-time discount data from eTilbudsavis API, so that I can find current deals from all major Danish grocery stores
 
 #### Acceptance Criteria
 
-1. WHEN discount data is provided to the system, THE Shopping Optimizer SHALL parse and store product information including price, product name, expiration date, and store name
-2. THE Shopping Optimizer SHALL identify all products in the discount data that match ingredients required for the user's meal plan
-3. THE Shopping Optimizer SHALL filter out products with expiration dates that fall outside the user's shopping timeframe
-4. THE Shopping Optimizer SHALL organize discount data by store location for proximity analysis
+1. THE Shopping Optimizer SHALL connect to the eTilbudsavis API to retrieve current campaign data
+2. WHEN fetching discount data, THE Shopping Optimizer SHALL parse JSON responses containing product information including price, product name, expiration date, and store name
+3. THE Shopping Optimizer SHALL identify all products in the discount data that match ingredients required for the user's meal plan
+4. THE Shopping Optimizer SHALL filter out products with expiration dates that fall outside the user's shopping timeframe
+5. THE Shopping Optimizer SHALL organize discount data by store location for proximity analysis
+6. THE Shopping Optimizer SHALL cache API responses to minimize redundant requests within a 24-hour period
 
 ### Requirement 3
 
@@ -112,17 +116,30 @@ The Shopping Optimizer is an intelligent agent system that analyzes grocery stor
 
 ### Requirement 9
 
-**User Story:** As a user, I want a simple web interface to input my shopping parameters, so that I can easily interact with the optimizer without technical knowledge
+**User Story:** As a user, I want a simple web interface to input my shopping parameters with address-based location, so that I can easily interact with the optimizer without technical knowledge
 
 #### Acceptance Criteria
 
-1. THE Shopping Optimizer SHALL provide a text input field for location entry
-2. THE Shopping Optimizer SHALL provide a text area for meal plan or meal idea entry
-3. THE Shopping Optimizer SHALL provide checkboxes for optimization preferences including Cost, Time, and Quality
-4. THE Shopping Optimizer SHALL allow the user to select multiple optimization preferences simultaneously
-5. THE Shopping Optimizer SHALL provide an "Optimize" button to trigger the optimization process
+1. THE Shopping Optimizer SHALL provide a text input field for address entry (street address, city, or postal code)
+2. THE Shopping Optimizer SHALL use Google Maps Geocoding API to convert addresses to coordinates
+3. THE Shopping Optimizer SHALL provide a text area for meal plan or meal idea entry
+4. THE Shopping Optimizer SHALL provide checkboxes for optimization preferences including Cost, Time, and Quality
+5. THE Shopping Optimizer SHALL allow the user to select multiple optimization preferences simultaneously
+6. THE Shopping Optimizer SHALL provide an "Optimize" button to trigger the optimization process
 
 ### Requirement 10
+
+**User Story:** As a user, I want the system to find nearby stores using my location, so that recommendations include only stores I can realistically visit
+
+#### Acceptance Criteria
+
+1. THE Shopping Optimizer SHALL use Google Maps Places API to identify grocery stores near the user's location
+2. THE Shopping Optimizer SHALL use Google Maps Distance Matrix API to calculate travel distance and time from user location to each store
+3. THE Shopping Optimizer SHALL filter out stores beyond a configurable maximum distance (default 20km)
+4. THE Shopping Optimizer SHALL include actual travel time in the time savings calculation
+5. THE Shopping Optimizer SHALL display store addresses and distances in the shopping recommendations
+
+### Requirement 11
 
 **User Story:** As a user, I want the interface to be intuitive and responsive, so that I can quickly get my shopping recommendations
 

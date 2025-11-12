@@ -2,9 +2,9 @@
 
 ## Overview
 
-The Shopping Optimizer is a web-based intelligent agent system built using Google ADK (Agent Development Kit) that processes user inputs (location, meal plans, preferences) and generates optimized shopping recommendations by analyzing mock discount data. The system uses a multi-stage pipeline: input validation → discount matching → ingredient identification → optimization → output formatting.
+The Shopping Optimizer is a web-based intelligent agent system built using Google ADK (Agent Development Kit) that processes user inputs (location, meal plans, preferences) and generates optimized shopping recommendations by analyzing real-time discount data from eTilbudsavis API and store locations via Google Maps API. The system uses a multi-stage pipeline: input validation → data fetching → discount matching → ingredient identification → optimization → output formatting.
 
-The architecture follows a modular design with clear separation between data models, business logic, optimization algorithms, and presentation layers.
+The architecture follows a modular design with clear separation between data models, external API integrations, business logic, optimization algorithms, and presentation layers.
 
 ## Architecture
 
@@ -14,13 +14,22 @@ The architecture follows a modular design with clear separation between data mod
 graph TB
     UI[Web UI] --> Agent[ADK Agent]
     Agent --> InputValidator[Input Validator]
-    InputValidator --> DiscountMatcher[Discount Matcher]
+    InputValidator --> GeocodingService[Google Maps Geocoding]
+    GeocodingService --> DataFetcher[Data Fetcher]
+    
+    DataFetcher --> ETilbudsavisAPI[eTilbudsavis API Client]
+    DataFetcher --> GooglePlaces[Google Places API]
+    
+    ETilbudsavisAPI --> DiscountMatcher[Discount Matcher]
+    GooglePlaces --> DiscountMatcher
+    
     DiscountMatcher --> IngredientMapper[Ingredient Mapper]
     IngredientMapper --> Optimizer[Multi-Criteria Optimizer]
-    Optimizer --> OutputFormatter[Output Formatter]
+    Optimizer --> DistanceCalculator[Google Distance Matrix]
+    DistanceCalculator --> OutputFormatter[Output Formatter]
     OutputFormatter --> UI
     
-    DiscountData[(Mock Discount Data)] --> DiscountMatcher
+    Cache[(Redis Cache)] --> ETilbudsavisAPI
     MealDatabase[(Meal-Ingredient DB)] --> IngredientMapper
 ```
 
@@ -28,8 +37,9 @@ graph TB
 
 1. **Presentation Layer**: Web UI built with ADK's web interface
 2. **Agent Layer**: Google ADK agent orchestrating the optimization workflow
-3. **Business Logic Layer**: Core optimization algorithms and matching logic
-4. **Data Layer**: Mock discount data and meal-ingredient mappings
+3. **Integration Layer**: External API clients (eTilbudsavis, Google Maps)
+4. **Business Logic Layer**: Core optimization algorithms and matching logic
+5. **Data Layer**: Cache and meal-ingredient mappings
 
 ## Components and Interfaces
 
@@ -118,25 +128,74 @@ class InputValidator:
 - Parse timeframe strings ("this week", "next 7 days") into date ranges
 - Ensure at least one optimization preference is selected
 
+#### ETilbudsavisAPIClient
+**Responsibility**: Fetch real-time discount data from eTilbudsavis API
+
+**Interface**:
+```python
+class ETilbudsavisAPIClient:
+    def fetch_campaigns(self, location: Location, radius_km: float) -> List[DiscountItem]
+    def parse_campaign_response(self, json_data: dict) -> List[DiscountItem]
+    def get_cached_campaigns(self) -> Optional[List[DiscountItem]]
+    def cache_campaigns(self, campaigns: List[DiscountItem], ttl_hours: int = 24)
+```
+
+**Key Logic**:
+- API endpoint: `https://etilbudsavis.dk/api/v2/` (or appropriate endpoint)
+- Parse JSON response to extract: product name, store, price, discount %, expiration date
+- Cache responses for 24 hours to minimize API calls
+- Handle rate limiting and API errors gracefully
+
+**API Response Example**:
+```json
+{
+  "offers": [
+    {
+      "heading": "Hakket oksekød",
+      "pricing": {"price": 39.95, "pre_price": 59.95},
+      "dealer": {"name": "Netto"},
+      "run_from": "2025-11-10",
+      "run_till": "2025-11-16"
+    }
+  ]
+}
+```
+
+#### GoogleMapsService
+**Responsibility**: Geocoding and store location services
+
+**Interface**:
+```python
+class GoogleMapsService:
+    def geocode_address(self, address: str) -> Location
+    def find_nearby_stores(self, location: Location, radius_km: float) -> List[StoreLocation]
+    def calculate_distance_matrix(self, origin: Location, destinations: List[Location]) -> Dict[str, float]
+```
+
+**Key Logic**:
+- Geocoding API: Convert user address to lat/lng coordinates
+- Places API: Search for grocery stores (types: "supermarket", "grocery_or_supermarket")
+- Distance Matrix API: Calculate actual driving distance and time
+- Cache geocoding results to minimize API calls
+
 #### DiscountMatcher
-**Responsibility**: Load and filter discount data based on location and timeframe
+**Responsibility**: Filter discount data from eTilbudsavis
 
 **Interface**:
 ```python
 class DiscountMatcher:
-    def load_discounts(self) -> List[DiscountItem]
     def filter_by_location(self, discounts: List[DiscountItem], 
                           user_location: Location, 
                           max_distance_km: float) -> List[DiscountItem]
     def filter_by_timeframe(self, discounts: List[DiscountItem], 
                            timeframe: Timeframe) -> List[DiscountItem]
-    def calculate_distance(self, loc1: Location, loc2: Location) -> float
+    def deduplicate_discounts(self, discounts: List[DiscountItem]) -> List[DiscountItem]
 ```
 
 **Key Logic**:
-- Use Haversine formula for distance calculation
+- Deduplicate based on product name + store + price
+- Filter by location using Google Maps distance data
 - Filter discounts where expiration_date >= timeframe.start_date
-- Return discounts within reasonable driving distance (e.g., 20km radius)
 
 #### IngredientMapper
 **Responsibility**: Map meals to required ingredients and match with available products
@@ -254,30 +313,81 @@ static/
 ## Testing Strategy
 
 ### Unit Tests
-1. InputValidator: Test validation logic for all input fields
-2. DiscountMatcher: Test distance calculation and filtering
-3. IngredientMapper: Test meal-to-ingredient mapping and fuzzy matching
-4. MultiCriteriaOptimizer: Test scoring algorithm with different preferences
-5. OutputFormatter: Test output formatting and tip generation
+1. **ETilbudsavisAPIClient**: Test API response parsing, caching logic, error handling
+2. **EmailCampaignParser**: Test Gemini prompt construction, JSON extraction, image handling
+3. **GoogleMapsService**: Test geocoding, places search, distance matrix parsing
+4. **InputValidator**: Test validation logic for all input fields
+5. **DiscountMatcher**: Test aggregation, deduplication, filtering
+6. **IngredientMapper**: Test meal-to-ingredient mapping and fuzzy matching
+7. **MultiCriteriaOptimizer**: Test scoring algorithm with different preferences
+8. **OutputFormatter**: Test output formatting and tip generation
 
 ### Integration Tests
-1. End-to-end optimization flow with complete user request
-2. Multi-preference optimization scenarios
-3. Edge cases with limited discount data
+1. End-to-end optimization flow with real API calls (use test API keys)
+2. Email parsing flow: Gmail API → Gemini → Database storage
+3. Hybrid data flow: eTilbudsavis + Email campaigns → Optimization
+4. Multi-preference optimization scenarios
+5. Edge cases: No email campaigns, API failures, no nearby stores
+
+### API Mocking for Development
+- Use mock responses for eTilbudsavis during development
+- Mock Gmail API with sample promotional emails
+- Mock Google Maps responses with Copenhagen test data
+- Switch to real APIs via environment variable flag
+
+## API Configuration
+
+### Required API Keys and Services
+
+1. **eTilbudsavis API**
+   - Endpoint: `https://etilbudsavis.dk/api/v2/`
+   - Authentication: API key (if required) or public access
+   - Rate limits: Check documentation
+   - Environment variable: `ETILBUDSAVIS_API_KEY`
+
+2. **Google Maps APIs**
+   - Geocoding API: Convert addresses to coordinates
+   - Places API: Find nearby grocery stores
+   - Distance Matrix API: Calculate travel distances
+   - Environment variable: `GOOGLE_MAPS_API_KEY`
+   - Enable all three APIs in Google Cloud Console
+
+### Environment Variables (.env)
+```
+ETILBUDSAVIS_API_KEY=your_key_here
+GOOGLE_MAPS_API_KEY=your_key_here
+REDIS_URL=redis://localhost:6379
+```
+
+## Data Models
+
+### Extended DiscountItem
+```python
+@dataclass
+class DiscountItem:
+    product_name: str
+    store_name: str
+    store_location: Location
+    store_address: str  # NEW: Full address from Google Maps
+    original_price: float
+    discount_price: float
+    discount_percent: float
+    expiration_date: date
+    is_organic: bool
+    travel_distance_km: float  # NEW: From Google Maps
+    travel_time_minutes: float  # NEW: From Google Maps
+```
 
 ## Design Decisions
 
-### 1. Google ADK Framework
-**Rationale**: Built-in web UI support, agent orchestration, easy integration with Google AI models
+### 1. Google Maps Integration
+**Rationale**: Provides accurate real-world distances and travel times, improving optimization quality
 
-### 2. Mock Data Approach
-**Rationale**: Faster development, no external dependencies, easy testing
+### 2. Redis Caching
+**Rationale**: Reduces API calls to eTilbudsavis (24h cache) and Google Maps (geocoding cache), improves performance and reduces costs
 
 ### 3. Multi-Criteria Scoring
 **Rationale**: Flexible optimization, handles conflicting preferences gracefully
 
 ### 4. Fuzzy Ingredient Matching
 **Rationale**: Handles variations in product naming, supports multiple languages
-
-### 5. Store Consolidation
-**Rationale**: Balances best deals with shopping convenience
