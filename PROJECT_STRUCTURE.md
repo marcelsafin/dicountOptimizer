@@ -20,6 +20,15 @@ dicountOptimizer/
 │           ├── design.md             # Design dokument
 │           └── tasks.md              # Implementation tasks
 │
+├── templates/
+│   └── index.html                    # Web UI huvudsida
+│
+├── static/
+│   ├── css/
+│   │   └── styles.css                # UI styling
+│   └── js/
+│       └── app.js                    # Frontend JavaScript
+│
 └── agents/
     ├── agent.py                      # ADK entry point (wrapper)
     └── discount_optimizer/

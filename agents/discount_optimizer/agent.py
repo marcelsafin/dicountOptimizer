@@ -1,190 +1,280 @@
 """
-Discount Optimizer Agent - Optimerar matinköp baserat på erbjudanden och preferenser
+Discount Optimizer Agent - Orchestrates the shopping optimization pipeline.
+
+This module defines the root ADK agent that wires together all components:
+- InputValidator: Validates user inputs
+- DiscountMatcher: Filters discounts by location and timeframe
+- IngredientMapper: Maps meals to ingredients and matches with products
+- MultiCriteriaOptimizer: Optimizes product-store combinations
+- SavingsCalculator: Calculates monetary and time savings
+- OutputFormatter: Formats the final recommendation
 """
 
-from typing import List, Dict, Any
-import json
+from typing import Dict, Any
 import os
 from dotenv import load_dotenv
 from google.adk.agents.llm_agent import Agent
-from .models import MOCK_DISCOUNTS, MEAL_INGREDIENTS
 
-# Ladda environment variables från .env
+from .input_validator import InputValidator, ValidationError
+from .discount_matcher import DiscountMatcher
+from .ingredient_mapper import IngredientMapper
+from .multi_criteria_optimizer import MultiCriteriaOptimizer
+from .savings_calculator import SavingsCalculator
+from .output_formatter import OutputFormatter
+
+# Load environment variables
 load_dotenv()
 
 
-def get_discounts_by_location(location: str) -> List[Dict[str, Any]]:
-    """
-    Hämtar aktuella erbjudanden baserat på användarens plats.
-    
-    Args:
-        location: Stad eller område där användaren vill handla (t.ex. "Köpenhamn", "Copenhagen")
-        
-    Returns:
-        Lista med erbjudanden i området som dictionaries
-    """
-    # Konvertera DiscountItem objekt till dictionaries
-    discounts_list = []
-    for discount in MOCK_DISCOUNTS:
-        discounts_list.append({
-            "store": discount.store_name,
-            "product": discount.product_name,
-            "original_price": discount.original_price,
-            "discount_price": discount.discount_price,
-            "discount_percent": discount.discount_percent,
-            "is_organic": discount.is_organic,
-            "expiration_date": discount.expiration_date.isoformat()
-        })
-    
-    return discounts_list
-
-
-def filter_products_by_preferences(
-    discounts: List[Dict[str, Any]], 
-    preferences: List[str]
-) -> List[Dict[str, Any]]:
-    """
-    Filtrerar produkter baserat på användarens preferenser och matrecept.
-    
-    Args:
-        discounts: Lista med tillgängliga erbjudanden
-        preferences: Lista med önskade produkter/ingredienser
-        
-    Returns:
-        Filtrerad lista med relevanta erbjudanden
-    """
-    if not preferences:
-        return discounts
-    
-    filtered = []
-    for discount in discounts:
-        product_name = discount["product"].lower()
-        for pref in preferences:
-            if pref.lower() in product_name:
-                filtered.append(discount)
-                break
-    
-    return filtered
-
-
-def optimize_shopping_plan(
-    location: str,
-    meal_type: str,
-    preferences: List[str] | None = None
+def optimize_shopping(
+    latitude: float,
+    longitude: float,
+    meal_plan: list[str],
+    timeframe: str = "this week",
+    maximize_savings: bool = True,
+    minimize_stores: bool = False,
+    prefer_organic: bool = False
 ) -> Dict[str, Any]:
     """
-    Skapar en optimerad inköpsplan baserat på plats, måltidstyp och preferenser.
+    Main optimization workflow that orchestrates all components.
+    
+    Pipeline: validate → match → map → optimize → calculate → format
     
     Args:
-        location: Stad där användaren vill handla (t.ex. "Köpenhamn", "Copenhagen")
-        meal_type: Typ av måltid (t.ex. "tacos", "pasta", "grøntsagssuppe")
-        preferences: Valfria preferenser eller restriktioner (t.ex. ["ekologisk", "billig"])
+        latitude: User's latitude coordinate (-90 to 90)
+        longitude: User's longitude coordinate (-180 to 180)
+        meal_plan: List of meal names (e.g., ["taco", "pasta", "grøntsagssuppe"])
+        timeframe: Shopping timeframe (e.g., "this week", "next 7 days")
+        maximize_savings: Whether to maximize monetary savings
+        minimize_stores: Whether to minimize number of stores
+        prefer_organic: Whether to prefer organic products
         
     Returns:
-        Optimerad inköpsplan med butiker, produkter och besparingar
+        Dictionary containing:
+        - success: Boolean indicating if optimization succeeded
+        - recommendation: Formatted shopping recommendation (if successful)
+        - error: Error message (if failed)
+        
+    Requirements: 1.5, 2.1, 3.1, 4.4, 5.4
     """
-    # Hämta erbjudanden för platsen
-    discounts = get_discounts_by_location(location)
-    
-    if not discounts:
+    try:
+        # Stage 1: Input Validation
+        validator = InputValidator()
+        
+        raw_input = {
+            'location': {
+                'latitude': latitude,
+                'longitude': longitude
+            },
+            'meal_plan': meal_plan,
+            'timeframe': timeframe,
+            'preferences': {
+                'maximize_savings': maximize_savings,
+                'minimize_stores': minimize_stores,
+                'prefer_organic': prefer_organic
+            }
+        }
+        
+        user_input = validator.validate(raw_input)
+        
+    except ValidationError as e:
         return {
-            "success": False,
-            "message": f"Inga erbjudanden hittades för {location}",
-            "plan": []
+            'success': False,
+            'error': f"Validation error: {str(e)}"
+        }
+    except Exception as e:
+        return {
+            'success': False,
+            'error': f"Unexpected validation error: {str(e)}"
         }
     
-    # Hämta ingredienser från MEAL_INGREDIENTS databasen
-    keywords = MEAL_INGREDIENTS.get(meal_type.lower(), [])
-    
-    # Om måltidstypen inte finns, försök hitta liknande
-    if not keywords:
-        # Fallback till gamla keywords
-        meal_keywords_fallback = {
-            "tacos": ["tortillas", "köttfärs", "ost", "gräddfil", "salsa", "tomatpuré"],
-            "pasta": ["pasta", "köttfärs", "tomatpuré", "ost", "grädde"],
-            "sallad": ["sallad", "tomat", "gurka", "ost", "dressing"]
-        }
-        keywords = meal_keywords_fallback.get(meal_type.lower(), [])
-    
-    if preferences:
-        keywords.extend(preferences)
-    
-    filtered_discounts = filter_products_by_preferences(discounts, keywords)
-    
-    # Gruppera per butik och beräkna besparingar
-    stores = {}
-    total_savings = 0
-    
-    for discount in filtered_discounts:
-        store = discount["store"]
-        if store not in stores:
-            stores[store] = {
-                "products": [],
-                "total_original": 0,
-                "total_discount": 0,
-                "savings": 0
+    try:
+        # Stage 2: Discount Matching
+        matcher = DiscountMatcher()
+        
+        # Load all available discounts
+        all_discounts = matcher.load_discounts()
+        
+        # Filter by location (within 20km radius)
+        location_filtered = matcher.filter_by_location(
+            all_discounts,
+            user_input.location,
+            max_distance_km=20.0
+        )
+        
+        # Filter by timeframe (exclude expired discounts)
+        valid_discounts = matcher.filter_by_timeframe(
+            location_filtered,
+            user_input.timeframe
+        )
+        
+        if not valid_discounts:
+            return {
+                'success': False,
+                'error': "No discounts available in your area within the specified timeframe"
             }
         
-        stores[store]["products"].append(discount)
-        stores[store]["total_original"] += discount["original_price"]
-        stores[store]["total_discount"] += discount["discount_price"]
-        stores[store]["savings"] += (discount["original_price"] - discount["discount_price"])
-        total_savings += (discount["original_price"] - discount["discount_price"])
+    except Exception as e:
+        return {
+            'success': False,
+            'error': f"Error matching discounts: {str(e)}"
+        }
     
-    # Hitta bästa butiken
-    best_store = max(stores.items(), key=lambda x: x[1]["savings"]) if stores else None
+    try:
+        # Stage 3: Ingredient Mapping
+        mapper = IngredientMapper()
+        
+        # Get all required ingredients for the meal plan
+        all_ingredients = []
+        for meal in user_input.meal_plan:
+            ingredients = mapper.get_ingredients_for_meal(meal)
+            all_ingredients.extend(ingredients)
+        
+        # Remove duplicates while preserving order
+        unique_ingredients = list(dict.fromkeys(all_ingredients))
+        
+        if not unique_ingredients:
+            return {
+                'success': False,
+                'error': f"Could not find ingredient information for meals: {', '.join(user_input.meal_plan)}"
+            }
+        
+        # Match products to ingredients
+        ingredient_matches = mapper.match_products_to_ingredients(
+            unique_ingredients,
+            valid_discounts
+        )
+        
+        # Check if we have at least some matches
+        matched_ingredients = [ing for ing, matches in ingredient_matches.items() if matches]
+        if not matched_ingredients:
+            return {
+                'success': False,
+                'error': "No matching products found for your meal plan"
+            }
+        
+    except Exception as e:
+        return {
+            'success': False,
+            'error': f"Error mapping ingredients: {str(e)}"
+        }
     
-    return {
-        "success": True,
-        "location": location,
-        "meal_type": meal_type,
-        "total_savings": total_savings,
-        "best_store": best_store[0] if best_store else None,
-        "stores": stores,
-        "recommendation": f"Handla på {best_store[0]} och spara {best_store[1]['savings']} kr!" if best_store else "Inga erbjudanden hittades"
-    }
+    try:
+        # Stage 4: Multi-Criteria Optimization
+        optimizer = MultiCriteriaOptimizer()
+        
+        optimized_purchases = optimizer.optimize(
+            ingredient_matches,
+            user_input.preferences,
+            user_input.location,
+            user_input.timeframe.start_date
+        )
+        
+        if not optimized_purchases:
+            return {
+                'success': False,
+                'error': "Could not generate optimized shopping plan"
+            }
+        
+    except Exception as e:
+        return {
+            'success': False,
+            'error': f"Error optimizing purchases: {str(e)}"
+        }
+    
+    try:
+        # Stage 5: Savings Calculation
+        calculator = SavingsCalculator()
+        
+        total_savings = calculator.calculate_monetary_savings(optimized_purchases)
+        time_savings = calculator.calculate_time_savings(
+            optimized_purchases,
+            user_input.location
+        )
+        
+    except Exception as e:
+        return {
+            'success': False,
+            'error': f"Error calculating savings: {str(e)}"
+        }
+    
+    try:
+        # Stage 6: Output Formatting
+        formatter = OutputFormatter()
+        
+        # Generate tips and motivation message
+        tips = formatter.generate_tips(optimized_purchases)
+        motivation_message = formatter.generate_motivation(total_savings, time_savings)
+        
+        # Create ShoppingRecommendation object
+        from .models import ShoppingRecommendation
+        
+        recommendation = ShoppingRecommendation(
+            purchases=optimized_purchases,
+            total_savings=total_savings,
+            time_savings=time_savings,
+            tips=tips,
+            motivation_message=motivation_message
+        )
+        
+        # Format the recommendation
+        formatted_output = formatter.format_recommendation(recommendation)
+        
+        return {
+            'success': True,
+            'recommendation': formatted_output,
+            'total_savings': total_savings,
+            'time_savings': time_savings,
+            'num_purchases': len(optimized_purchases)
+        }
+        
+    except Exception as e:
+        return {
+            'success': False,
+            'error': f"Error formatting output: {str(e)}"
+        }
 
 
-# Root agent definition (för ADK)
+# Root agent definition for Google ADK
 root_agent = Agent(
     model='gemini-2.0-flash-exp',
-    name='discount_optimizer',
-    description="En hjälpsam agent som optimerar matinköp utifrån erbjudanden, användarens plats och preferenser",
-    instruction="""Du är en hjälpsam shoppingassistent som hjälper användare att optimera sina matinköp.
-    
-    Du kan:
-    - Hitta bästa erbjudanden i olika svenska städer
-    - Föreslå optimerade inköpsplaner för olika måltider (tacos, pasta, sallad)
-    - Beräkna potentiella besparingar
-    - Rekommendera vilken butik användaren ska handla i
-    
-    Använd verktygen för att hjälpa användaren hitta de bästa erbjudandena!""",
-    tools=[
-        get_discounts_by_location,
-        filter_products_by_preferences,
-        optimize_shopping_plan
-    ]
+    name='shopping_optimizer',
+    description="An intelligent shopping assistant that optimizes grocery shopping based on discounts, location, meal plans, and user preferences",
+    instruction="""You are a helpful shopping optimization assistant that helps users save money and time on grocery shopping.
+
+You can help users:
+- Find the best discounts for their meal plans
+- Optimize shopping across multiple stores based on their preferences
+- Calculate potential savings in both money and time
+- Generate actionable shopping recommendations organized by store and day
+
+When users provide their location (coordinates), meal plan, and preferences, use the optimize_shopping tool to generate a comprehensive shopping recommendation.
+
+Always be friendly and explain the benefits of the optimized plan!""",
+    tools=[optimize_shopping]
 )
 
 
-# Test-funktion
+# Test function for development
 if __name__ == "__main__":
-    # Testa agenten
-    print("=== Test: Discount Optimizer Agent ===\n")
+    print("=== Shopping Optimizer Agent Test ===\n")
     
-    result = optimize_shopping_plan(
-        location="Stockholm",
-        meal_type="tacos",
-        preferences=[]
+    # Test with Copenhagen coordinates and a meal plan
+    result = optimize_shopping(
+        latitude=55.6761,
+        longitude=12.5683,
+        meal_plan=["taco", "pasta"],
+        timeframe="this week",
+        maximize_savings=True,
+        minimize_stores=True,
+        prefer_organic=False
     )
     
-    print(f"Plats: {result['location']}")
-    print(f"Måltid: {result['meal_type']}")
-    print(f"Total besparing: {result['total_savings']} kr")
-    print(f"Rekommendation: {result['recommendation']}\n")
-    
-    if result['best_store']:
-        best = result['stores'][result['best_store']]
-        print(f"Produkter på {result['best_store']}:")
-        for product in best['products']:
-            print(f"  - {product['product']}: {product['discount_price']} kr (spara {product['original_price'] - product['discount_price']} kr)")
+    if result['success']:
+        print("✓ Optimization successful!\n")
+        print(result['recommendation'])
+        print(f"\nTotal savings: {result['total_savings']:.2f} kr")
+        print(f"Time savings: {result['time_savings']:.2f} hours")
+        print(f"Number of purchases: {result['num_purchases']}")
+    else:
+        print(f"✗ Optimization failed: {result['error']}")

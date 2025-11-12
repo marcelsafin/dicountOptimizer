@@ -1,0 +1,124 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Shopping Optimizer</title>
+    <link rel="stylesheet" href="/static/css/styles.css">
+</head>
+<body>
+    <div class="container">
+        <header>
+            <h1>🛒 Shopping Optimizer</h1>
+            <p class="subtitle">Get the best deals for your meal plan</p>
+        </header>
+
+        <main>
+            <section class="input-section">
+                <form id="optimizer-form">
+                    <div class="form-group">
+                        <label for="location">Location</label>
+                        <input 
+                            type="text" 
+                            id="location" 
+                            name="location" 
+                            placeholder="e.g., Copenhagen or 55.6761,12.5683"
+                            required
+                        >
+                        <small>Enter city name or coordinates (latitude, longitude)</small>
+                    </div>
+
+                    <div class="form-group">
+                        <label for="meal-plan">Meal Plan</label>
+                        <textarea 
+                            id="meal-plan" 
+                            name="meal-plan" 
+                            rows="5" 
+                            placeholder="Enter your meals, one per line&#10;e.g.,&#10;Tacos&#10;Pasta&#10;Veggie soup"
+                            required
+                        ></textarea>
+                        <small>List the meals you want to prepare</small>
+                    </div>
+
+                    <div class="form-group">
+                        <label>Optimization Preferences</label>
+                        <div class="checkbox-group">
+                            <label class="checkbox-label">
+                                <input type="checkbox" id="pref-cost" name="preferences" value="cost">
+                                <span>💰 Cost - Maximize savings</span>
+                            </label>
+                            <label class="checkbox-label">
+                                <input type="checkbox" id="pref-time" name="preferences" value="time">
+                                <span>⏱️ Time - Minimize stores</span>
+                            </label>
+                            <label class="checkbox-label">
+                                <input type="checkbox" id="pref-quality" name="preferences" value="quality">
+                                <span>🌿 Quality - Prefer organic</span>
+                            </label>
+                        </div>
+                    </div>
+
+                    <button type="submit" class="btn-optimize" id="optimize-btn">
+                        Optimize My Shopping
+                    </button>
+                </form>
+            </section>
+
+            <section class="results-section" id="results-section" style="display: none;">
+                <h2>Your Optimized Shopping Plan</h2>
+                
+                <div class="results-content">
+                    <div class="shopping-list-container">
+                        <h3>📋 Shopping List</h3>
+                        <div id="shopping-list" class="shopping-list">
+                            <!-- Shopping list will be populated here -->
+                        </div>
+                    </div>
+
+                    <div class="savings-container">
+                        <h3>💵 Savings Summary</h3>
+                        <div id="savings-summary" class="savings-summary">
+                            <div class="savings-item">
+                                <span class="savings-label">Monetary Savings:</span>
+                                <span class="savings-value" id="monetary-savings">-</span>
+                            </div>
+                            <div class="savings-item">
+                                <span class="savings-label">Time Savings:</span>
+                                <span class="savings-value" id="time-savings">-</span>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="tips-container">
+                        <h3>💡 Tips & Recommendations</h3>
+                        <ul id="tips-list" class="tips-list">
+                            <!-- Tips will be populated here -->
+                        </ul>
+                    </div>
+
+                    <div class="motivation-container">
+                        <p id="motivation-message" class="motivation-message">
+                            <!-- Motivation message will be populated here -->
+                        </p>
+                    </div>
+                </div>
+            </section>
+
+            <div class="loading-spinner" id="loading-spinner" style="display: none;">
+                <div class="spinner"></div>
+                <p>Optimizing your shopping plan...</p>
+            </div>
+
+            <div class="error-message" id="error-message" style="display: none;">
+                <p id="error-text"></p>
+            </div>
+        </main>
+
+        <footer>
+            <p>Powered by Google ADK | Shopping Optimizer Agent</p>
+        </footer>
+    </div>
+
+    <script src="/static/js/app.js"></script>
+</body>
+</html>

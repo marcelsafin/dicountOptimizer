@@ -38,13 +38,13 @@
   - Assign optimal purchase days based on discount expiration and meal timing
   - _Requirements: 4.1, 4.2, 4.3, 4.4, 4.5_
 
-- [ ] 6. Implement SavingsCalculator component
+- [x] 6. Implement SavingsCalculator component
   - Write calculate_monetary_savings function summing all discount savings
   - Write calculate_time_savings function using heuristic (30 min/store + 5 min/km travel)
   - Calculate baseline time (shopping at closest store) vs optimized plan time
   - _Requirements: 6.1, 6.2, 6.3, 6.4_
 
-- [ ] 7. Implement OutputFormatter component
+- [x] 7. Implement OutputFormatter component
   - Write group_by_store_and_day function to organize purchases
   - Write generate_tips function for time-sensitive discounts and organic recommendations
   - Limit tips to top 3 most impactful
@@ -52,14 +52,14 @@
   - Write format_recommendation function to create human-readable output
   - _Requirements: 5.1, 5.2, 5.3, 5.4, 5.5, 7.1, 7.2, 7.3, 7.4, 7.5, 8.1, 8.2, 8.3, 8.4, 8.5_
 
-- [ ] 8. Create ADK agent orchestration
+- [x] 8. Create ADK agent orchestration
   - Define root_agent function for Google ADK
   - Wire together all components in optimization pipeline
   - Implement main optimization workflow: validate → match → map → optimize → format
   - Add error handling for each pipeline stage
   - _Requirements: 1.5, 2.1, 3.1, 4.4, 5.4_
 
-- [ ] 9. Build web UI with HTML/CSS/JavaScript
+- [x] 9. Build web UI with HTML/CSS/JavaScript
   - Create index.html with input form matching UI sketch
   - Add location text input field
   - Add meal plan textarea
