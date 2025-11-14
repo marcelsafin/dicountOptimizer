@@ -2,3 +2,9 @@ google-adk
 python-dotenv
 flask
 requests
+pydantic>=2.0.0
+pydantic-settings>=2.0.0
+tenacity>=8.0.0
+structlog>=23.0.0
+httpx>=0.25.0
+mypy>=1.7.0

@@ -4,6 +4,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Shopping Optimizer</title>
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
     <link rel="stylesheet" href="/static/css/styles.css">
 </head>
 <body>
@@ -45,6 +46,39 @@
                     </div>
 
                     <div class="form-group">
+                        <label>Meal Type Filters</label>
+                        <div class="filter-group">
+                            <label class="filter-checkbox">
+                                <input type="checkbox" id="filter-breakfast" name="meal-type" value="breakfast" checked>
+                                <span>🌅 Breakfast</span>
+                            </label>
+                            <label class="filter-checkbox">
+                                <input type="checkbox" id="filter-lunch" name="meal-type" value="lunch" checked>
+                                <span>🌞 Lunch</span>
+                            </label>
+                            <label class="filter-checkbox">
+                                <input type="checkbox" id="filter-dinner" name="meal-type" value="dinner" checked>
+                                <span>🌙 Dinner</span>
+                            </label>
+                            <label class="filter-checkbox">
+                                <input type="checkbox" id="filter-snacks" name="meal-type" value="snacks" checked>
+                                <span>🍿 Snacks</span>
+                            </label>
+                        </div>
+                    </div>
+
+                    <div class="form-group">
+                        <label for="exclude-ingredients">Exclude Ingredients/Allergens</label>
+                        <input 
+                            type="text" 
+                            id="exclude-ingredients" 
+                            name="exclude-ingredients" 
+                            placeholder="e.g., nuts, dairy, gluten (comma-separated)"
+                        >
+                        <small>Enter ingredients or allergens to exclude from meal suggestions</small>
+                    </div>
+
+                    <div class="form-group">
                         <label>Optimization Preferences (0 = Not Important, 5 = Very Important)</label>
                         <div class="slider-group">
                             <div class="slider-item">
@@ -81,6 +115,16 @@
                 <h2>Your Optimized Shopping Plan</h2>
                 
                 <div class="results-content">
+                    <div class="map-container">
+                        <h3>🗺️ Nearby Stores</h3>
+                        <div id="store-map" class="store-map">
+                            <!-- Map will be rendered here -->
+                        </div>
+                        <div id="store-list" class="store-list">
+                            <!-- Store list will be populated here -->
+                        </div>
+                    </div>
+
                     <div class="shopping-list-container">
                         <h3>📋 Shopping List</h3>
                         <div id="shopping-list" class="shopping-list">
@@ -132,6 +176,7 @@
         </footer>
     </div>
 
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
     <script src="/static/js/app.js"></script>
 </body>
 </html>

@@ -34,7 +34,9 @@ def optimize_shopping(
     timeframe: str = "this week",
     maximize_savings: bool = True,
     minimize_stores: bool = False,
-    prefer_organic: bool = False
+    prefer_organic: bool = False,
+    meal_types: list[str] = None,
+    excluded_ingredients: list[str] = None
 ) -> Dict[str, Any]:
     """
     Main optimization workflow that orchestrates all components.
@@ -49,6 +51,8 @@ def optimize_shopping(
         maximize_savings: Whether to maximize monetary savings
         minimize_stores: Whether to minimize number of stores
         prefer_organic: Whether to prefer organic products
+        meal_types: List of meal types to include (e.g., ["breakfast", "lunch", "dinner"])
+        excluded_ingredients: List of ingredients/allergens to exclude
         
     Returns:
         Dictionary containing:
@@ -56,8 +60,12 @@ def optimize_shopping(
         - recommendation: Formatted shopping recommendation (if successful)
         - error: Error message (if failed)
         
-    Requirements: 1.5, 2.1, 3.1, 4.4, 5.4
+    Requirements: 1.5, 2.1, 3.1, 4.4, 5.4, 8.5, 11.4
     """
+    if meal_types is None:
+        meal_types = ['breakfast', 'lunch', 'dinner', 'snacks']
+    if excluded_ingredients is None:
+        excluded_ingredients = []
     try:
         # Stage 1: Input Validation
         validator = InputValidator()
@@ -136,14 +144,41 @@ def optimize_shopping(
                 # Extract product names from valid discounts
                 available_products = list(set([d.product_name for d in valid_discounts]))
                 
+                # Filter out excluded ingredients
+                if excluded_ingredients:
+                    excluded_lower = [ing.lower() for ing in excluded_ingredients]
+                    available_products = [
+                        p for p in available_products 
+                        if not any(excl in p.lower() for excl in excluded_lower)
+                    ]
+                    # Also filter the discounts list
+                    valid_discounts = [
+                        d for d in valid_discounts
+                        if not any(excl in d.product_name.lower() for excl in excluded_lower)
+                    ]
+                
+                # Prepare detailed product information for better meal suggestions
+                product_details = []
+                for discount in valid_discounts:
+                    product_details.append({
+                        'name': discount.product_name,
+                        'expiration_date': discount.expiration_date,
+                        'discount_percent': discount.discount_percent,
+                        'is_organic': discount.is_organic,
+                        'store_name': discount.store_name
+                    })
+                
                 # Get user preference text (if provided)
                 user_pref = meal_plan[0] if meal_plan else ""
                 
-                # Generate meal suggestions
+                # Generate meal suggestions with detailed product info and filters
                 suggested_meals = suggester.suggest_meals(
                     available_products=available_products,
                     user_preferences=user_pref,
-                    num_meals=3
+                    num_meals=3,
+                    product_details=product_details,
+                    meal_types=meal_types,
+                    excluded_ingredients=excluded_ingredients
                 )
                 
                 meal_plan = suggested_meals
@@ -254,12 +289,36 @@ def optimize_shopping(
         # Format the recommendation
         formatted_output = formatter.format_recommendation(recommendation)
         
+        # Extract unique store locations for map display
+        store_locations = {}
+        for purchase in optimized_purchases:
+            # Find the discount item for this purchase
+            for discount in valid_discounts:
+                if (discount.product_name.lower() == purchase.product_name.lower() and 
+                    discount.store_name == purchase.store_name):
+                    if purchase.store_name not in store_locations:
+                        store_locations[purchase.store_name] = {
+                            'name': discount.store_name,
+                            'address': discount.store_address,
+                            'latitude': discount.store_location.latitude,
+                            'longitude': discount.store_location.longitude,
+                            'distance_km': discount.travel_distance_km,
+                            'products': []
+                        }
+                    store_locations[purchase.store_name]['products'].append({
+                        'name': discount.product_name,
+                        'price': discount.discount_price,
+                        'discount_percent': discount.discount_percent
+                    })
+                    break
+        
         return {
             'success': True,
             'recommendation': formatted_output,
             'total_savings': total_savings,
             'time_savings': time_savings,
-            'num_purchases': len(optimized_purchases)
+            'num_purchases': len(optimized_purchases),
+            'stores': list(store_locations.values())
         }
         
     except Exception as e:

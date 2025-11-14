@@ -1,4 +1,4 @@
-# Implementation Plan
+ # Implementation Plan
 
 - [x] 1. Set up environment configuration and API credentials
   - Create .env.example file with Salling Group API key and Gemini API key
@@ -101,21 +101,21 @@
   - Test error handling when Gemini API fails
   - _Requirements: All requirements_
 
-- [-] 13. Optimize Gemini prompt for better meal suggestions
+- [x] 13. Optimize Gemini prompt for better meal suggestions
   - Refine prompt to encourage diverse meal types (breakfast, lunch, dinner, snacks)
   - Add instructions for considering dietary restrictions
   - Test prompt variations to improve meal creativity
   - Ensure meals prioritize products expiring soonest
   - _Requirements: 3.1, 3.2, 7.3_
 
-- [ ] 14. Add UI enhancements
+- [x] 14. Add UI enhancements
   - Display map showing nearby stores with food waste offers
   - Add filters for meal types (breakfast, lunch, dinner)
   - Add ability to exclude certain ingredients or allergens
   - Show product images if available from Salling API
   - _Requirements: 8.5, 11.4_
 
-- [ ]* 15. Write unit tests for core components
+- [x] 15. Write unit tests for core components
   - Test InputValidator with various coordinate formats
   - Test SallingAPIClient with mocked API responses
   - Test DiscountMatcher Haversine distance calculations
@@ -124,14 +124,14 @@
   - Test OutputFormatter formatting logic
   - _Requirements: All requirements_
 
-- [ ]* 16. Write integration tests
+- [x] 16. Write integration tests
   - Test complete workflow with mocked Salling and Gemini APIs
   - Test error handling scenarios (API failures, no products, invalid location)
   - Test caching behavior
   - Test edge cases (products expiring today, very high discounts)
   - _Requirements: All requirements_
 
-- [ ]* 17. Documentation and deployment
+- [x] 17. Documentation and deployment
   - Update README.md with setup instructions for Salling Group API key
   - Document how to obtain Gemini 2.5 Pro API access
   - Add user guide explaining the 2km radius and food waste focus

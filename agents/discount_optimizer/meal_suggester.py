@@ -38,7 +38,10 @@ class MealSuggester:
         self, 
         available_products: List[str],
         user_preferences: str = "",
-        num_meals: int = 3
+        num_meals: int = 3,
+        product_details: Optional[List[dict]] = None,
+        meal_types: Optional[List[str]] = None,
+        excluded_ingredients: Optional[List[str]] = None
     ) -> List[str]:
         """
         Suggest meals based on available discount products and user preferences.
@@ -47,14 +50,24 @@ class MealSuggester:
             available_products: List of product names available on discount
             user_preferences: Optional user description of what they want to eat
             num_meals: Number of meal suggestions to generate
+            product_details: Optional list of dicts with product details (price, expiration, etc.)
+            meal_types: List of meal types to include (breakfast, lunch, dinner, snacks)
+            excluded_ingredients: List of ingredients/allergens to exclude
             
         Returns:
             List of meal names suggested by Gemini
             
-        Requirements: 3.1, 3.2, 3.3, 3.4, 3.5
+        Requirements: 3.1, 3.2, 3.3, 3.4, 3.5, 7.3, 8.5, 11.4
         """
         # Create prompt for Gemini
-        prompt = self._create_prompt(available_products, user_preferences, num_meals)
+        prompt = self._create_prompt(
+            available_products, 
+            user_preferences, 
+            num_meals, 
+            product_details,
+            meal_types,
+            excluded_ingredients
+        )
         
         try:
             # Call Gemini API using latest SDK patterns
@@ -102,21 +115,96 @@ class MealSuggester:
         self, 
         available_products: List[str],
         user_preferences: str,
-        num_meals: int
+        num_meals: int,
+        product_details: Optional[List[dict]] = None,
+        meal_types: Optional[List[str]] = None,
+        excluded_ingredients: Optional[List[str]] = None
     ) -> str:
-        """Create prompt for Gemini - optimized to reduce thinking tokens."""
+        """
+        Create optimized prompt for Gemini with diverse meal types and expiration prioritization.
+        
+        Requirements: 3.1, 3.2, 7.3, 8.5, 11.4
+        """
         # Limit products list to avoid token overflow
         products_sample = available_products[:20] if len(available_products) > 20 else available_products
-        products_list = ", ".join(products_sample)
         
-        prompt = f"""Suggest {num_meals} meal names using these products: {products_list}
+        # Build detailed product list with expiration info if available
+        if product_details:
+            product_lines = []
+            today = date.today()
+            
+            for detail in product_details[:20]:  # Limit to 20 products
+                product_name = detail.get('name', '')
+                expiration = detail.get('expiration_date')
+                discount_percent = detail.get('discount_percent', 0)
+                
+                # Calculate days until expiration
+                days_until_expiry = None
+                urgency_marker = ""
+                if expiration:
+                    if isinstance(expiration, str):
+                        try:
+                            expiration = date.fromisoformat(expiration)
+                        except:
+                            pass
+                    if isinstance(expiration, date):
+                        days_until_expiry = (expiration - today).days
+                        if days_until_expiry <= 2:
+                            urgency_marker = " [URGENT - expires in " + str(days_until_expiry) + " days]"
+                        elif days_until_expiry <= 5:
+                            urgency_marker = " [expires soon - " + str(days_until_expiry) + " days]"
+                
+                product_line = f"- {product_name}"
+                if discount_percent > 0:
+                    product_line += f" ({int(discount_percent)}% off)"
+                product_line += urgency_marker
+                product_lines.append(product_line)
+            
+            products_text = "\n".join(product_lines)
+        else:
+            products_text = "\n".join([f"- {p}" for p in products_sample])
+        
+        # Build comprehensive prompt with diverse meal types and dietary considerations
+        prompt = f"""You are a creative chef helping reduce food waste by suggesting meals using discounted products.
+
+Available products:
+{products_text}
+
+Task: Suggest {num_meals} diverse and creative meal ideas using these products.
+
+Requirements:
+1. DIVERSITY: Include different meal types - breakfast, lunch, dinner, snacks, or desserts
+2. URGENCY: Prioritize products marked as URGENT or expiring soon in your meal suggestions
+3. CREATIVITY: Think beyond obvious combinations - be inventive with flavors and cuisines
+4. PRACTICALITY: Suggest meals that can realistically be made with available products
+"""
+        
+        # Add meal type filters if provided
+        if meal_types and len(meal_types) < 4:  # Only add if user has filtered
+            meal_types_str = ", ".join(meal_types)
+            prompt += f"5. MEAL TYPES: Only suggest meals suitable for: {meal_types_str}\n"
+        
+        # Add excluded ingredients if provided
+        if excluded_ingredients:
+            excluded_str = ", ".join(excluded_ingredients)
+            prompt += f"6. EXCLUSIONS: Do NOT suggest meals containing: {excluded_str}\n"
+        
+        # Add user preferences if provided
+        if user_preferences:
+            prompt += f"7. USER PREFERENCE: Consider this preference - {user_preferences}\n"
+        
+        # Add dietary restriction guidance
+        prompt += """
+Common dietary considerations to keep in mind:
+- Vegetarian options (if no meat products are needed)
+- Quick meals (under 30 minutes)
+- Family-friendly options
+- Budget-conscious combinations
 
 """
         
-        if user_preferences:
-            prompt += f"Preference: {user_preferences}\n"
-        
-        prompt += f"""Return ONLY {num_meals} meal names, one per line. Examples: "Taco", "Pasta Bolognese", "Grøntsagssuppe"
+        prompt += f"""Output format: Return ONLY {num_meals} meal names, one per line.
+Examples: "Morgenmad Burrito", "Hurtig Pasta Carbonara", "Grøntsagssuppe med Brød", "Taco Tuesday"
 
 Meals:"""
         

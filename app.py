@@ -121,6 +121,12 @@ def optimize():
                 'error': 'At least one meal is required'
             }), 400
         
+        # Get meal type filters
+        meal_types = data.get('meal_types', ['breakfast', 'lunch', 'dinner', 'snacks'])
+        
+        # Get excluded ingredients
+        excluded_ingredients = data.get('excluded_ingredients', [])
+        
         # Get preferences
         preferences = data.get('preferences', {})
         maximize_savings = preferences.get('maximize_savings', False)
@@ -142,8 +148,17 @@ def optimize():
             timeframe="this week",
             maximize_savings=maximize_savings,
             minimize_stores=minimize_stores,
-            prefer_organic=prefer_organic
+            prefer_organic=prefer_organic,
+            meal_types=meal_types,
+            excluded_ingredients=excluded_ingredients
         )
+        
+        # Add user location to result for map display
+        if result.get('success'):
+            result['user_location'] = {
+                'latitude': latitude,
+                'longitude': longitude
+            }
         
         return jsonify(result)
         

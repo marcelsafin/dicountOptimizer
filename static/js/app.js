@@ -132,6 +132,18 @@ document.addEventListener('DOMContentLoaded', function() {
         const timeValue = parseFloat(timeSlider.value);
         const qualityValue = parseFloat(qualitySlider.value);
 
+        // Get meal type filters
+        const mealTypes = [];
+        document.querySelectorAll('input[name="meal-type"]:checked').forEach(checkbox => {
+            mealTypes.push(checkbox.value);
+        });
+
+        // Get excluded ingredients
+        const excludeInput = document.getElementById('exclude-ingredients').value.trim();
+        const excludedIngredients = excludeInput 
+            ? excludeInput.split(',').map(item => item.trim()).filter(item => item.length > 0)
+            : [];
+
         // Parse meal plan into array (or send as single preference string)
         let meals = [];
         if (mealPlan) {
@@ -151,6 +163,8 @@ document.addEventListener('DOMContentLoaded', function() {
         return {
             location: location,
             meals: meals,
+            meal_types: mealTypes,
+            excluded_ingredients: excludedIngredients,
             preferences: {
                 maximize_savings: costValue > 0,
                 minimize_stores: timeValue > 0,
@@ -200,6 +214,12 @@ document.addEventListener('DOMContentLoaded', function() {
         
         // Parse the recommendation text to extract structured data
         const recommendation = result.recommendation;
+        
+        // Display map with stores
+        if (result.stores && result.stores.length > 0 && result.user_location) {
+            displayStoreMap(result.stores, result.user_location);
+            displayStoreList(result.stores);
+        }
         
         // Populate shopping list with formatted recommendation
         const shoppingList = document.getElementById('shopping-list');
@@ -386,5 +406,122 @@ document.addEventListener('DOMContentLoaded', function() {
      */
     function hideError() {
         errorMessage.style.display = 'none';
+    }
+
+    /**
+     * Display store map using Leaflet
+     */
+    let storeMapInstance = null;
+    
+    function displayStoreMap(stores, userLocation) {
+        const mapContainer = document.getElementById('store-map');
+        
+        // Clear existing map if any
+        if (storeMapInstance) {
+            storeMapInstance.remove();
+        }
+        
+        // Create map centered on user location
+        storeMapInstance = L.map('store-map').setView(
+            [userLocation.latitude, userLocation.longitude], 
+            13
+        );
+        
+        // Add OpenStreetMap tiles
+        L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+            attribution: '© OpenStreetMap contributors',
+            maxZoom: 19
+        }).addTo(storeMapInstance);
+        
+        // Add user location marker
+        const userIcon = L.divIcon({
+            className: 'user-marker',
+            html: '<div style="background: #667eea; width: 20px; height: 20px; border-radius: 50%; border: 3px solid white; box-shadow: 0 2px 8px rgba(0,0,0,0.3);"></div>',
+            iconSize: [20, 20],
+            iconAnchor: [10, 10]
+        });
+        
+        L.marker([userLocation.latitude, userLocation.longitude], { icon: userIcon })
+            .addTo(storeMapInstance)
+            .bindPopup('<strong>Your Location</strong>');
+        
+        // Add store markers
+        stores.forEach((store, index) => {
+            const storeIcon = L.divIcon({
+                className: 'store-marker',
+                html: `<div style="background: #ff6b6b; width: 30px; height: 30px; border-radius: 50%; border: 3px solid white; box-shadow: 0 2px 8px rgba(0,0,0,0.3); display: flex; align-items: center; justify-content: center; color: white; font-weight: bold; font-size: 14px;">${index + 1}</div>`,
+                iconSize: [30, 30],
+                iconAnchor: [15, 15]
+            });
+            
+            const productList = store.products
+                .map(p => `${p.name} (${p.discount_percent}% off)`)
+                .join('<br>');
+            
+            L.marker([store.latitude, store.longitude], { icon: storeIcon })
+                .addTo(storeMapInstance)
+                .bindPopup(`
+                    <strong>${escapeHtml(store.name)}</strong><br>
+                    <small>${escapeHtml(store.address)}</small><br>
+                    <small style="color: #667eea; font-weight: 600;">${store.distance_km.toFixed(1)} km away</small><br>
+                    <hr style="margin: 5px 0;">
+                    <small>${productList}</small>
+                `);
+        });
+        
+        // Fit map to show all markers
+        const bounds = L.latLngBounds([
+            [userLocation.latitude, userLocation.longitude],
+            ...stores.map(s => [s.latitude, s.longitude])
+        ]);
+        storeMapInstance.fitBounds(bounds, { padding: [50, 50] });
+    }
+
+    /**
+     * Display store list below map
+     */
+    function displayStoreList(stores) {
+        const storeList = document.getElementById('store-list');
+        
+        const storeCards = stores.map((store, index) => {
+            const productCount = store.products.length;
+            const productText = productCount === 1 ? '1 product' : `${productCount} products`;
+            
+            return `
+                <div class="store-card">
+                    <div class="store-card-header">
+                        <span style="background: #ff6b6b; color: white; width: 24px; height: 24px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-weight: bold; font-size: 12px;">${index + 1}</span>
+                        <h4>${escapeHtml(store.name)}</h4>
+                    </div>
+                    <div class="store-card-address">${escapeHtml(store.address)}</div>
+                    <div class="store-card-distance">📍 ${store.distance_km.toFixed(1)} km away</div>
+                    <div class="store-card-products">
+                        <strong>${productText}</strong> with discounts
+                    </div>
+                </div>
+            `;
+        }).join('');
+        
+        storeList.innerHTML = storeCards;
+    }
+
+    /**
+     * Helper function to display product with image if available
+     * Note: Currently Salling API doesn't provide image URLs, but this is ready for future use
+     */
+    function formatProductWithImage(product) {
+        if (product.image_url) {
+            return `
+                <div class="product-with-image">
+                    <img src="${escapeHtml(product.image_url)}" alt="${escapeHtml(product.name)}" class="product-image" />
+                    <div class="product-details">
+                        <strong>${escapeHtml(product.name)}</strong><br>
+                        <small>${product.price} kr (${product.discount_percent}% off)</small>
+                    </div>
+                </div>
+            `;
+        } else {
+            return `<div>${escapeHtml(product.name)} - ${product.price} kr (${product.discount_percent}% off)</div>`;
+        }
     }
 });
