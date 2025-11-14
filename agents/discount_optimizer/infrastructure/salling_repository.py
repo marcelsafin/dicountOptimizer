@@ -221,6 +221,10 @@ class SallingDiscountRepository:
             logger.error("http_error", error=str(e), error_type=type(e).__name__)
             raise APIError(f"HTTP error occurred: {str(e)}") from e
         
+        except ValidationError:
+            # Re-raise validation errors without wrapping
+            raise
+        
         except Exception as e:
             logger.error("unexpected_error", error=str(e), error_type=type(e).__name__)
             raise APIError(f"Unexpected error fetching discounts: {str(e)}") from e

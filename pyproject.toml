@@ -24,7 +24,6 @@ disallow_subclassing_any = true
 strict_optional = true
 warn_unreachable = true
 
-[tool.mypy.overrides]
 # Allow gradual typing for existing code during migration
 [[tool.mypy.overrides]]
 module = "agents.*"

@@ -5,7 +5,7 @@ This module provides type-safe configuration management with environment variabl
 validation, secrets handling, and feature flags for gradual rollout.
 """
 
-from pydantic import Field, SecretStr, field_validator
+from pydantic import Field, SecretStr, field_validator, ValidationInfo
 from pydantic_settings import BaseSettings, SettingsConfigDict
 from typing import Literal
 import logging
@@ -255,7 +255,7 @@ class Settings(BaseSettings):
     
     @field_validator('retry_max_wait_seconds')
     @classmethod
-    def validate_retry_wait_times(cls, v: float, info) -> float:
+    def validate_retry_wait_times(cls, v: float, info: ValidationInfo) -> float:
         """Ensure max wait time is greater than min wait time."""
         if 'retry_min_wait_seconds' in info.data:
             min_wait = info.data['retry_min_wait_seconds']
@@ -297,7 +297,8 @@ class Settings(BaseSettings):
         Returns:
             Logging level constant (e.g., logging.INFO)
         """
-        return getattr(logging, self.log_level)
+        level: int = getattr(logging, self.log_level)
+        return level
     
     def is_production(self) -> bool:
         """Check if running in production environment."""
@@ -307,7 +308,7 @@ class Settings(BaseSettings):
         """Check if running in development environment."""
         return self.environment == 'dev'
     
-    def get_agent_config(self) -> dict:
+    def get_agent_config(self) -> dict[str, int | float]:
         """
         Get agent generation configuration as a dictionary.
         
@@ -342,7 +343,8 @@ class Settings(BaseSettings):
 
 # Global settings instance - loaded once at module import
 # This ensures consistent configuration across the application
-settings = Settings()
+# Note: pydantic-settings loads from environment variables automatically
+settings = Settings()  # type: ignore[call-arg]
 
 # Validate required keys on startup
 try:
@@ -383,5 +385,5 @@ def reload_settings() -> Settings:
         New Settings instance
     """
     global settings
-    settings = Settings()
+    settings = Settings()  # type: ignore[call-arg]
     return settings
