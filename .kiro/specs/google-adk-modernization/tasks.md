@@ -44,7 +44,7 @@ Transform the Shopping Optimizer into an enterprise-grade, type-safe system usin
   - Define AgentError for agent execution failures
   - _Requirements: 4.3, 4.5_
 
-- [ ] 5. Implement configuration management with Pydantic Settings
+- [x] 5. Implement configuration management with Pydantic Settings
   - Create agents/discount_optimizer/config.py
   - Define Settings class with all configuration fields
   - Add environment variable validation
@@ -58,7 +58,7 @@ Transform the Shopping Optimizer into an enterprise-grade, type-safe system usin
 
 ## Phase 2: Infrastructure Layer
 
-- [ ] 6. Implement async Salling API repository
+- [-] 6. Implement async Salling API repository
   - Create agents/discount_optimizer/infrastructure/ directory
   - Create salling_repository.py with SallingDiscountRepository class
   - Implement __init__ with httpx.AsyncClient and connection pooling

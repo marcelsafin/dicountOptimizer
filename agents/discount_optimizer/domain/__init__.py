@@ -8,6 +8,12 @@ from .models import (
     Purchase,
     ShoppingRecommendation,
 )
+from .exceptions import (
+    ShoppingOptimizerError,
+    ValidationError,
+    APIError,
+    AgentError,
+)
 
 __all__ = [
     "Location",
@@ -16,4 +22,8 @@ __all__ = [
     "DiscountItem",
     "Purchase",
     "ShoppingRecommendation",
+    "ShoppingOptimizerError",
+    "ValidationError",
+    "APIError",
+    "AgentError",
 ]
