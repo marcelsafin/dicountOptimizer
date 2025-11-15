@@ -22,8 +22,10 @@ from ..domain.models import Location, DiscountItem
 from ..domain.protocols import DiscountRepository
 from ..domain.exceptions import APIError, ValidationError
 from ..config import settings
+from ..metrics import get_metrics_collector
 
 logger = structlog.get_logger(__name__)
+metrics_collector = get_metrics_collector()
 
 
 class SallingDiscountRepository:
@@ -153,79 +155,89 @@ class SallingDiscountRepository:
         )
         
         try:
-            # Cap radius at API maximum
-            radius_km_capped = min(radius_km, 100.0)
-            
-            # Build request parameters
-            # Salling API expects geo parameter in format "latitude,longitude"
-            params: dict[str, str | float] = {
-                "geo": f"{location.latitude},{location.longitude}",
-                "radius": radius_km_capped,
-            }
-            
-            # Make API request
-            response = await self._client.get(
-                f"{self.BASE_URL}/food-waste/",
-                params=params,
-            )
-            
-            # Handle rate limiting
-            if response.status_code == 429:
-                retry_after = response.headers.get("Retry-After", "60")
-                logger.warning(
-                    "api_rate_limited",
-                    retry_after=retry_after,
-                    status_code=response.status_code,
-                )
-                raise APIError(
-                    f"API rate limit exceeded. Retry after {retry_after} seconds.",
-                    status_code=429,
-                    response_body=response.text,
+            # Track API call timing and success
+            with metrics_collector.time_api_call("salling", "/food-waste"):
+                # Cap radius at API maximum
+                radius_km_capped = min(radius_km, 100.0)
+                
+                # Build request parameters
+                # Salling API expects geo parameter in format "latitude,longitude"
+                params: dict[str, str | float] = {
+                    "geo": f"{location.latitude},{location.longitude}",
+                    "radius": radius_km_capped,
+                }
+                
+                # Make API request
+                response = await self._client.get(
+                    f"{self.BASE_URL}/food-waste/",
+                    params=params,
                 )
             
-            # Handle other HTTP errors
-            if response.status_code >= 400:
-                logger.error(
-                    "api_request_failed",
-                    status_code=response.status_code,
-                    response_body=response.text[:500],  # Truncate for logging
+                # Handle rate limiting
+                if response.status_code == 429:
+                    retry_after = response.headers.get("Retry-After", "60")
+                    logger.warning(
+                        "api_rate_limited",
+                        retry_after=retry_after,
+                        status_code=response.status_code,
+                    )
+                    raise APIError(
+                        f"API rate limit exceeded. Retry after {retry_after} seconds.",
+                        status_code=429,
+                        response_body=response.text,
+                    )
+                
+                # Handle other HTTP errors
+                if response.status_code >= 400:
+                    logger.error(
+                        "api_request_failed",
+                        status_code=response.status_code,
+                        response_body=response.text[:500],  # Truncate for logging
+                    )
+                    raise APIError(
+                        f"API request failed with status {response.status_code}",
+                        status_code=response.status_code,
+                        response_body=response.text,
+                    )
+                
+                response.raise_for_status()
+                
+                # Parse JSON response
+                json_data = response.json()
+                
+                # Parse and validate discount items
+                discounts = self._parse_response(json_data)
+                
+                # Record successful API call
+                metrics_collector.record_api_success("salling", "/food-waste")
+                
+                logger.info(
+                    "discounts_fetched",
+                    count=len(discounts),
+                    location=(location.latitude, location.longitude),
+                    radius_km=radius_km_capped,
                 )
-                raise APIError(
-                    f"API request failed with status {response.status_code}",
-                    status_code=response.status_code,
-                    response_body=response.text,
-                )
-            
-            response.raise_for_status()
-            
-            # Parse JSON response
-            json_data = response.json()
-            
-            # Parse and validate discount items
-            discounts = self._parse_response(json_data)
-            
-            logger.info(
-                "discounts_fetched",
-                count=len(discounts),
-                location=(location.latitude, location.longitude),
-                radius_km=radius_km_capped,
-            )
-            
-            return discounts
+                
+                return discounts
             
         except httpx.TimeoutException as e:
+            metrics_collector.record_api_failure("salling", "/food-waste", error_type="timeout")
             logger.error("api_timeout", error=str(e))
             raise APIError(f"API request timed out after {settings.api_timeout_seconds}s") from e
         
         except httpx.HTTPError as e:
+            status_code = getattr(e.response, 'status_code', None) if hasattr(e, 'response') else None
+            metrics_collector.record_api_failure("salling", "/food-waste", status_code=status_code, error_type="http_error")
             logger.error("http_error", error=str(e), error_type=type(e).__name__)
             raise APIError(f"HTTP error occurred: {str(e)}") from e
         
-        except ValidationError:
+        except ValidationError as e:
+            metrics_collector.record_api_failure("salling", "/food-waste", error_type="validation_error")
             # Re-raise validation errors without wrapping
             raise
         
         except Exception as e:
+            metrics_collector.record_api_failure("salling", "/food-waste", error_type=type(e).__name__)
             logger.error("unexpected_error", error=str(e), error_type=type(e).__name__)
             raise APIError(f"Unexpected error fetching discounts: {str(e)}") from e
     

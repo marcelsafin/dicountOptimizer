@@ -1,0 +1,75 @@
+# Prometheus configuration for Shopping Optimizer monitoring
+#
+# This configuration file sets up Prometheus to scrape metrics from the
+# Shopping Optimizer application. It includes:
+# - Scrape configuration for the application metrics endpoint
+# - Alert rules for critical conditions
+# - Recording rules for common queries
+#
+# Usage:
+#   prometheus --config.file=prometheus.yml
+#
+# Requirements: 10.2, 10.3, 10.6
+
+global:
+  scrape_interval: 15s  # Scrape metrics every 15 seconds
+  evaluation_interval: 15s  # Evaluate rules every 15 seconds
+  external_labels:
+    cluster: 'shopping-optimizer'
+    environment: 'production'
+
+# Alertmanager configuration (optional)
+alerting:
+  alertmanagers:
+    - static_configs:
+        - targets:
+            # - 'alertmanager:9093'  # Uncomment and configure if using Alertmanager
+
+# Load alert rules
+rule_files:
+  - 'alert_rules.yml'
+  # - 'recording_rules.yml'  # Uncomment if you create recording rules
+
+# Scrape configurations
+scrape_configs:
+  # Shopping Optimizer application metrics
+  - job_name: 'shopping-optimizer'
+    scrape_interval: 15s
+    scrape_timeout: 10s
+    metrics_path: '/metrics/prometheus'
+    static_configs:
+      - targets:
+          - 'localhost:3000'  # Adjust host and port as needed
+        labels:
+          service: 'shopping-optimizer'
+          component: 'api'
+    
+    # Optional: Add basic authentication if your endpoint is protected
+    # basic_auth:
+    #   username: 'prometheus'
+    #   password: 'your-password'
+    
+    # Optional: Add TLS configuration if using HTTPS
+    # tls_config:
+    #   insecure_skip_verify: false
+    #   ca_file: '/path/to/ca.crt'
+
+  # Health check endpoint (for uptime monitoring)
+  - job_name: 'shopping-optimizer-health'
+    scrape_interval: 30s
+    scrape_timeout: 5s
+    metrics_path: '/health/detailed'
+    static_configs:
+      - targets:
+          - 'localhost:3000'
+        labels:
+          service: 'shopping-optimizer'
+          component: 'health'
+
+  # Prometheus self-monitoring
+  - job_name: 'prometheus'
+    static_configs:
+      - targets:
+          - 'localhost:9090'
+        labels:
+          service: 'prometheus'

@@ -66,6 +66,10 @@ class MockCacheRepository:
     async def set(self, key: str, value: bytes, ttl_seconds: int) -> None:
         """Mock set to cache."""
         pass
+    
+    async def health_check(self) -> bool:
+        """Mock health check."""
+        return True
 
 
 class TestAgentFactory:

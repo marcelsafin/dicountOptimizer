@@ -52,6 +52,10 @@ class MockGeocodingService:
         """Mock calculate_distance method."""
         self.distance_calls.append((origin, destination))
         return 5.2  # Default distance
+    
+    async def health_check(self) -> bool:
+        """Mock health check method."""
+        return True
 
 
 # ============================================================================

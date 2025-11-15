@@ -27,6 +27,7 @@ from agents.discount_optimizer.agents.shopping_optimizer_agent import ShoppingOp
 from agents.discount_optimizer.domain.exceptions import ValidationError, ShoppingOptimizerError
 from agents.discount_optimizer.logging import get_logger, set_correlation_id, LogContext
 from agents.discount_optimizer.config import settings
+from agents.discount_optimizer.metrics import get_metrics_collector
 
 # Load environment variables from .env file
 load_dotenv()
@@ -74,6 +75,9 @@ def initialize_agent_factory() -> AgentFactory:
 
 # Initialize factory on startup
 agent_factory = initialize_agent_factory()
+
+# Initialize metrics collector
+metrics_collector = get_metrics_collector()
 
 app = Flask(__name__)
 
@@ -134,6 +138,8 @@ async def health_detailed() -> tuple[Response, int] | Response:
     Requirements: 10.3
     """
     from datetime import datetime, timezone
+    
+    assert agent_factory is not None, "Agent factory not initialized"
     
     correlation_id = str(uuid.uuid4())
     set_correlation_id(correlation_id)
@@ -271,6 +277,8 @@ async def optimize() -> tuple[Response, int] | Response:
     correlation_id = str(uuid.uuid4())
     set_correlation_id(correlation_id)
     
+    assert agent_factory is not None, "Agent factory not initialized"
+    
     with LogContext(correlation_id=correlation_id, endpoint='/api/optimize'):
         try:
             logger.info("api_request_received", method=request.method, correlation_id=correlation_id)
@@ -362,15 +370,27 @@ async def optimize() -> tuple[Response, int] | Response:
             # Create agent and run optimization
             agent = agent_factory.create_shopping_optimizer_agent()
             
-            # Run async agent (Flask with asgiref supports async routes)
-            recommendation = await agent.run(agent_input)
-            
-            logger.info(
-                "optimization_completed",
-                total_purchases=len(recommendation.purchases),
-                total_savings=float(recommendation.total_savings),
-                correlation_id=correlation_id
-            )
+            # Run async agent with metrics tracking
+            try:
+                with metrics_collector.time_agent("shopping_optimizer"):
+                    recommendation = await agent.run(agent_input)
+                
+                # Record success
+                metrics_collector.record_agent_success("shopping_optimizer")
+                
+                logger.info(
+                    "optimization_completed",
+                    total_purchases=len(recommendation.purchases),
+                    total_savings=float(recommendation.total_savings),
+                    correlation_id=correlation_id
+                )
+            except Exception as agent_error:
+                # Record failure
+                metrics_collector.record_agent_failure(
+                    "shopping_optimizer",
+                    error_type=type(agent_error).__name__
+                )
+                raise
             
             # Convert Pydantic model to dict for JSON response
             recommendation_dict = {
@@ -446,6 +466,92 @@ async def optimize() -> tuple[Response, int] | Response:
                 'error_type': 'server',
                 'correlation_id': correlation_id
             }), 500
+
+
+@app.route('/metrics', methods=['GET'])
+def metrics() -> tuple[Response, int] | Response:
+    """
+    Metrics endpoint for monitoring and observability.
+    
+    Returns all collected metrics in JSON format, including:
+    - Agent execution metrics (timing, success rate)
+    - API call metrics (timing, success rate)
+    - Cache performance metrics
+    - System uptime
+    
+    Returns:
+    {
+        "system": {...},
+        "agents": {...},
+        "api": {...},
+        "cache": {...},
+        "counters": {...},
+        "timers": {...}
+    }
+    
+    Requirements: 10.2, 10.6
+    """
+    try:
+        all_metrics = metrics_collector.get_metrics()
+        return jsonify(all_metrics)
+    except Exception as e:
+        logger.error("metrics_endpoint_error", error=str(e))
+        return jsonify({
+            'error': 'Failed to retrieve metrics',
+            'message': str(e)
+        }), 500
+
+
+@app.route('/metrics/summary', methods=['GET'])
+def metrics_summary() -> tuple[Response, int] | Response:
+    """
+    Metrics summary endpoint with high-level statistics.
+    
+    Returns a concise summary of key metrics for quick monitoring.
+    
+    Returns:
+    {
+        "uptime_seconds": 12345.67,
+        "total_agent_executions": 100,
+        "total_api_calls": 250,
+        "overall_agent_success_rate": 98.5,
+        "overall_api_success_rate": 99.2,
+        "cache_hit_rate": 75.3,
+        "cache_total_requests": 500
+    }
+    
+    Requirements: 10.2, 10.6
+    """
+    try:
+        summary = metrics_collector.get_summary()
+        return jsonify(summary)
+    except Exception as e:
+        logger.error("metrics_summary_endpoint_error", error=str(e))
+        return jsonify({
+            'error': 'Failed to retrieve metrics summary',
+            'message': str(e)
+        }), 500
+
+
+@app.route('/metrics/prometheus', methods=['GET'])
+def metrics_prometheus() -> tuple[str, int, dict[str, str]]:
+    """
+    Prometheus-compatible metrics endpoint.
+    
+    Returns metrics in Prometheus text exposition format for scraping
+    by Prometheus monitoring systems.
+    
+    Returns:
+        Plain text metrics in Prometheus format
+    
+    Requirements: 10.2, 10.6
+    """
+    try:
+        prometheus_text = metrics_collector.export_prometheus()
+        return prometheus_text, 200, {'Content-Type': 'text/plain; charset=utf-8'}
+    except Exception as e:
+        logger.error("prometheus_metrics_endpoint_error", error=str(e))
+        return f"# Error exporting metrics: {str(e)}\n", 500, {'Content-Type': 'text/plain; charset=utf-8'}
 
 
 if __name__ == '__main__':

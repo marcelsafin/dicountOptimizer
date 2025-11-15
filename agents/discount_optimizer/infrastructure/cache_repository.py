@@ -14,8 +14,10 @@ import structlog
 
 from ..domain.protocols import CacheRepository
 from ..config import settings
+from ..metrics import get_metrics_collector
 
 logger = structlog.get_logger(__name__)
+metrics_collector = get_metrics_collector()
 
 
 class CacheEntry(TypedDict):
@@ -203,6 +205,7 @@ class InMemoryCacheRepository:
             
             if entry is None:
                 self._metrics.misses += 1
+                metrics_collector.record_cache_miss()
                 logger.debug("cache_miss", key=key)
                 return None
             
@@ -213,11 +216,14 @@ class InMemoryCacheRepository:
                 del self._cache[key]
                 self._metrics.misses += 1
                 self._metrics.evictions += 1
+                metrics_collector.record_cache_miss()
+                metrics_collector.record_cache_eviction()
                 logger.debug("cache_expired", key=key)
                 return None
             
             # Cache hit
             self._metrics.hits += 1
+            metrics_collector.record_cache_hit()
             logger.debug(
                 "cache_hit",
                 key=key,
@@ -258,6 +264,7 @@ class InMemoryCacheRepository:
             )
             
             self._metrics.sets += 1
+            metrics_collector.record_cache_set()
             
             logger.debug(
                 "cache_set",

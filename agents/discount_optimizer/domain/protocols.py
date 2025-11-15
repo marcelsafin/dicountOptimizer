@@ -122,6 +122,14 @@ class GeocodingService(Protocol):
             - Manhattan distance for grid-based calculations
         """
         ...
+    
+    async def health_check(self) -> bool:
+        """Check if the geocoding service is healthy and accessible.
+        
+        Returns:
+            True if the service is healthy, False otherwise
+        """
+        ...
 
 
 @runtime_checkable
@@ -173,5 +181,13 @@ class CacheRepository(Protocol):
         Note:
             If a key already exists, implementations should overwrite it
             with the new value and reset the TTL.
+        """
+        ...
+    
+    async def health_check(self) -> bool:
+        """Check if the cache is healthy and operational.
+        
+        Returns:
+            True if the cache is operational, False otherwise
         """
         ...

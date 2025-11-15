@@ -1,0 +1,215 @@
+# Prometheus alert rules for Shopping Optimizer
+#
+# This file defines alert rules for critical conditions in the Shopping Optimizer
+# application. Alerts are triggered when metrics exceed defined thresholds.
+#
+# Requirements: 10.2, 10.3, 10.6
+
+groups:
+  - name: shopping_optimizer_alerts
+    interval: 30s
+    rules:
+      # ========================================================================
+      # Agent Performance Alerts
+      # ========================================================================
+      
+      - alert: AgentSuccessRateLow
+        expr: |
+          (
+            rate(shopping_optimizer_agent_success_total[5m]) /
+            (rate(shopping_optimizer_agent_success_total[5m]) + rate(shopping_optimizer_agent_failure_total[5m]))
+          ) * 100 < 95
+        for: 5m
+        labels:
+          severity: warning
+          component: agent
+        annotations:
+          summary: "Agent success rate is below 95%"
+          description: "Agent {{ $labels.agent }} has a success rate of {{ $value | humanizePercentage }} over the last 5 minutes."
+      
+      - alert: AgentSuccessRateCritical
+        expr: |
+          (
+            rate(shopping_optimizer_agent_success_total[5m]) /
+            (rate(shopping_optimizer_agent_success_total[5m]) + rate(shopping_optimizer_agent_failure_total[5m]))
+          ) * 100 < 80
+        for: 2m
+        labels:
+          severity: critical
+          component: agent
+        annotations:
+          summary: "Agent success rate is critically low (< 80%)"
+          description: "Agent {{ $labels.agent }} has a success rate of {{ $value | humanizePercentage }} over the last 5 minutes. Immediate attention required."
+      
+      - alert: AgentExecutionSlow
+        expr: |
+          histogram_quantile(0.95, rate(shopping_optimizer_agent_duration_seconds_bucket[5m])) > 10
+        for: 5m
+        labels:
+          severity: warning
+          component: agent
+        annotations:
+          summary: "Agent execution is slow (p95 > 10s)"
+          description: "Agent {{ $labels.agent }} p95 execution time is {{ $value | humanizeDuration }} over the last 5 minutes."
+      
+      - alert: AgentExecutionVerySlow
+        expr: |
+          histogram_quantile(0.99, rate(shopping_optimizer_agent_duration_seconds_bucket[5m])) > 30
+        for: 2m
+        labels:
+          severity: critical
+          component: agent
+        annotations:
+          summary: "Agent execution is very slow (p99 > 30s)"
+          description: "Agent {{ $labels.agent }} p99 execution time is {{ $value | humanizeDuration }} over the last 5 minutes."
+      
+      # ========================================================================
+      # API Performance Alerts
+      # ========================================================================
+      
+      - alert: APISuccessRateLow
+        expr: |
+          (
+            rate(shopping_optimizer_api_success_total[5m]) /
+            (rate(shopping_optimizer_api_success_total[5m]) + rate(shopping_optimizer_api_failure_total[5m]))
+          ) * 100 < 90
+        for: 5m
+        labels:
+          severity: warning
+          component: api
+        annotations:
+          summary: "API success rate is below 90%"
+          description: "API {{ $labels.api }} has a success rate of {{ $value | humanizePercentage }} over the last 5 minutes."
+      
+      - alert: APISuccessRateCritical
+        expr: |
+          (
+            rate(shopping_optimizer_api_success_total[5m]) /
+            (rate(shopping_optimizer_api_success_total[5m]) + rate(shopping_optimizer_api_failure_total[5m]))
+          ) * 100 < 70
+        for: 2m
+        labels:
+          severity: critical
+          component: api
+        annotations:
+          summary: "API success rate is critically low (< 70%)"
+          description: "API {{ $labels.api }} has a success rate of {{ $value | humanizePercentage }} over the last 5 minutes. External service may be down."
+      
+      - alert: APILatencyHigh
+        expr: |
+          histogram_quantile(0.95, rate(shopping_optimizer_api_duration_seconds_bucket[5m])) > 5
+        for: 5m
+        labels:
+          severity: warning
+          component: api
+        annotations:
+          summary: "API latency is high (p95 > 5s)"
+          description: "API {{ $labels.api }} p95 latency is {{ $value | humanizeDuration }} over the last 5 minutes."
+      
+      - alert: APILatencyCritical
+        expr: |
+          histogram_quantile(0.99, rate(shopping_optimizer_api_duration_seconds_bucket[5m])) > 15
+        for: 2m
+        labels:
+          severity: critical
+          component: api
+        annotations:
+          summary: "API latency is critically high (p99 > 15s)"
+          description: "API {{ $labels.api }} p99 latency is {{ $value | humanizeDuration }} over the last 5 minutes."
+      
+      - alert: APIHighErrorRate
+        expr: |
+          rate(shopping_optimizer_api_failure_total[5m]) > 1
+        for: 5m
+        labels:
+          severity: warning
+          component: api
+        annotations:
+          summary: "API error rate is high (> 1 error/sec)"
+          description: "API {{ $labels.api }} is experiencing {{ $value | humanize }} errors per second over the last 5 minutes."
+      
+      # ========================================================================
+      # Cache Performance Alerts
+      # ========================================================================
+      
+      - alert: CacheHitRateLow
+        expr: shopping_optimizer_cache_hit_rate < 50
+        for: 10m
+        labels:
+          severity: warning
+          component: cache
+        annotations:
+          summary: "Cache hit rate is low (< 50%)"
+          description: "Cache hit rate is {{ $value | humanizePercentage }} over the last 10 minutes. Consider reviewing cache strategy."
+      
+      - alert: CacheHitRateVeryLow
+        expr: shopping_optimizer_cache_hit_rate < 25
+        for: 5m
+        labels:
+          severity: critical
+          component: cache
+        annotations:
+          summary: "Cache hit rate is very low (< 25%)"
+          description: "Cache hit rate is {{ $value | humanizePercentage }} over the last 5 minutes. Cache may not be functioning properly."
+      
+      # ========================================================================
+      # System Health Alerts
+      # ========================================================================
+      
+      - alert: ServiceDown
+        expr: up{job="shopping-optimizer"} == 0
+        for: 1m
+        labels:
+          severity: critical
+          component: system
+        annotations:
+          summary: "Shopping Optimizer service is down"
+          description: "The Shopping Optimizer service has been down for more than 1 minute."
+      
+      - alert: HighMemoryUsage
+        expr: |
+          (process_resident_memory_bytes / process_virtual_memory_max_bytes) * 100 > 80
+        for: 5m
+        labels:
+          severity: warning
+          component: system
+        annotations:
+          summary: "High memory usage (> 80%)"
+          description: "Memory usage is at {{ $value | humanizePercentage }} of available memory."
+      
+      - alert: NoRecentRequests
+        expr: |
+          rate(shopping_optimizer_agent_duration_seconds_count[10m]) == 0
+        for: 15m
+        labels:
+          severity: warning
+          component: system
+        annotations:
+          summary: "No requests received in the last 15 minutes"
+          description: "The service has not processed any requests in the last 15 minutes. This may indicate a problem with traffic routing or the service itself."
+      
+      # ========================================================================
+      # Error Rate Alerts
+      # ========================================================================
+      
+      - alert: HighAgentFailureRate
+        expr: |
+          rate(shopping_optimizer_agent_failure_total[5m]) > 0.5
+        for: 5m
+        labels:
+          severity: warning
+          component: agent
+        annotations:
+          summary: "High agent failure rate (> 0.5 failures/sec)"
+          description: "Agent {{ $labels.agent }} is experiencing {{ $value | humanize }} failures per second over the last 5 minutes."
+      
+      - alert: CriticalAgentFailureRate
+        expr: |
+          rate(shopping_optimizer_agent_failure_total[5m]) > 2
+        for: 2m
+        labels:
+          severity: critical
+          component: agent
+        annotations:
+          summary: "Critical agent failure rate (> 2 failures/sec)"
+          description: "Agent {{ $labels.agent }} is experiencing {{ $value | humanize }} failures per second over the last 5 minutes. Immediate investigation required."

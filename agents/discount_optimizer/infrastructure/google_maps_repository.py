@@ -20,8 +20,10 @@ from ..domain.models import Location
 from ..domain.protocols import GeocodingService
 from ..domain.exceptions import APIError, ValidationError
 from ..config import settings
+from ..metrics import get_metrics_collector
 
 logger = structlog.get_logger(__name__)
+metrics_collector = get_metrics_collector()
 
 
 class GoogleMapsRepository:
@@ -137,94 +139,102 @@ class GoogleMapsRepository:
         )
         
         try:
-            # Build request parameters
-            params: dict[str, str] = {
-                "address": address,
-                "key": self.api_key,
-            }
-            
-            # Make API request
-            response = await self._client.get(
-                self.GEOCODING_URL,
-                params=params,
-            )
-            
-            # Handle rate limiting
-            if response.status_code == 429:
-                retry_after = response.headers.get("Retry-After", "60")
-                logger.warning(
-                    "api_rate_limited",
-                    retry_after=retry_after,
-                    status_code=response.status_code,
-                )
-                raise APIError(
-                    f"API rate limit exceeded. Retry after {retry_after} seconds.",
-                    status_code=429,
-                    response_body=response.text,
+            # Track API call timing and success
+            with metrics_collector.time_api_call("google_maps", "/geocode"):
+                # Build request parameters
+                params: dict[str, str] = {
+                    "address": address,
+                    "key": self.api_key,
+                }
+                
+                # Make API request
+                response = await self._client.get(
+                    self.GEOCODING_URL,
+                    params=params,
                 )
             
-            # Handle other HTTP errors
-            if response.status_code >= 400:
-                logger.error(
-                    "api_request_failed",
-                    status_code=response.status_code,
-                    response_body=response.text[:500],  # Truncate for logging
-                )
-                raise APIError(
-                    f"API request failed with status {response.status_code}",
-                    status_code=response.status_code,
-                    response_body=response.text,
-                )
-            
-            response.raise_for_status()
-            
-            # Parse JSON response
-            json_data = response.json()
-            
-            # Check API status
-            status = json_data.get("status")
-            
-            if status == "ZERO_RESULTS":
-                logger.warning(
-                    "geocoding_no_results",
+                # Handle rate limiting
+                if response.status_code == 429:
+                    retry_after = response.headers.get("Retry-After", "60")
+                    logger.warning(
+                        "api_rate_limited",
+                        retry_after=retry_after,
+                        status_code=response.status_code,
+                    )
+                    raise APIError(
+                        f"API rate limit exceeded. Retry after {retry_after} seconds.",
+                        status_code=429,
+                        response_body=response.text,
+                    )
+                
+                # Handle other HTTP errors
+                if response.status_code >= 400:
+                    logger.error(
+                        "api_request_failed",
+                        status_code=response.status_code,
+                        response_body=response.text[:500],  # Truncate for logging
+                    )
+                    raise APIError(
+                        f"API request failed with status {response.status_code}",
+                        status_code=response.status_code,
+                        response_body=response.text,
+                    )
+                
+                response.raise_for_status()
+                
+                # Parse JSON response
+                json_data = response.json()
+                
+                # Check API status
+                status = json_data.get("status")
+                
+                if status == "ZERO_RESULTS":
+                    logger.warning(
+                        "geocoding_no_results",
+                        address=address,
+                    )
+                    raise ValidationError(f"Address not found: {address}")
+                
+                if status == "INVALID_REQUEST":
+                    logger.error(
+                        "geocoding_invalid_request",
+                        address=address,
+                    )
+                    raise ValidationError(f"Invalid geocoding request for address: {address}")
+                
+                if status != "OK":
+                    logger.error(
+                        "geocoding_api_error",
+                        status=status,
+                        address=address,
+                    )
+                    raise APIError(f"Geocoding API returned status: {status}")
+                
+                # Parse location from response
+                location = self._parse_geocoding_response(json_data, address)
+                
+                # Record successful API call
+                metrics_collector.record_api_success("google_maps", "/geocode")
+                
+                logger.info(
+                    "address_geocoded",
                     address=address,
+                    latitude=location.latitude,
+                    longitude=location.longitude,
                 )
-                raise ValidationError(f"Address not found: {address}")
-            
-            if status == "INVALID_REQUEST":
-                logger.error(
-                    "geocoding_invalid_request",
-                    address=address,
-                )
-                raise ValidationError(f"Invalid geocoding request for address: {address}")
-            
-            if status != "OK":
-                logger.error(
-                    "geocoding_api_error",
-                    status=status,
-                    address=address,
-                )
-                raise APIError(f"Geocoding API returned status: {status}")
-            
-            # Parse location from response
-            location = self._parse_geocoding_response(json_data, address)
-            
-            logger.info(
-                "address_geocoded",
-                address=address,
-                latitude=location.latitude,
-                longitude=location.longitude,
-            )
-            
-            return location
+                
+                return location
             
         except httpx.TimeoutException as e:
+            metrics_collector.record_api_failure("google_maps", "/geocode", error_type="timeout")
             logger.error("api_timeout", error=str(e), address=address)
             raise APIError(
                 f"Geocoding request timed out after {settings.api_timeout_seconds}s"
             ) from e
         
         except httpx.HTTPError as e:
+            status_code = getattr(e.response, 'status_code', None) if hasattr(e, 'response') else None
+            metrics_collector.record_api_failure("google_maps", "/geocode", status_code=status_code, error_type="http_error")
             logger.error(
                 "http_error",
                 error=str(e),
@@ -233,11 +243,13 @@ class GoogleMapsRepository:
             )
             raise APIError(f"HTTP error occurred: {str(e)}") from e
         
-        except (ValidationError, APIError):
+        except (ValidationError, APIError) as e:
+            metrics_collector.record_api_failure("google_maps", "/geocode", error_type=type(e).__name__)
             # Re-raise our custom errors without wrapping
             raise
         
         except Exception as e:
+            metrics_collector.record_api_failure("google_maps", "/geocode", error_type=type(e).__name__)
             logger.error(
                 "unexpected_error",
                 error=str(e),
