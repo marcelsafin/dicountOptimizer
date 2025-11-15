@@ -28,6 +28,7 @@ from .services.multi_criteria_optimizer_service import MultiCriteriaOptimizerSer
 from .infrastructure.google_maps_repository import GoogleMapsRepository
 from .infrastructure.salling_repository import SallingDiscountRepository
 from .infrastructure.cache_repository import InMemoryCacheRepository
+from .infrastructure.redis_cache_repository import create_cache_repository
 from .domain.protocols import GeocodingService, DiscountRepository, CacheRepository
 from .config import settings, Settings
 from .logging import get_logger
@@ -233,7 +234,7 @@ class AgentFactory:
         Get or create cache repository instance.
         
         Returns the injected cache repository if provided, otherwise creates
-        a new InMemoryCacheRepository instance.
+        a cache repository based on configuration (memory or redis).
         
         Returns:
             CacheRepository instance
@@ -244,9 +245,20 @@ class AgentFactory:
             logger.debug("using_injected_cache_repository")
             return self._cache_repository
         
-        # Create production instance
-        cache_repository = InMemoryCacheRepository()
-        logger.debug("created_in_memory_cache_repository")
+        # Create cache based on configuration
+        redis_config = self.config.get_redis_config()
+        cache_repository = create_cache_repository(
+            cache_type=self.config.cache_type,
+            redis_host=redis_config['host'],
+            redis_port=redis_config['port'],
+            redis_db=redis_config['db'],
+            redis_password=redis_config.get('password'),
+        )
+        
+        logger.debug(
+            "created_cache_repository",
+            cache_type=self.config.cache_type
+        )
         return cache_repository
     
     def get_meal_suggester_agent(self) -> MealSuggesterAgent:

@@ -7,7 +7,7 @@ validation, secrets handling, and feature flags for gradual rollout.
 
 from pydantic import Field, SecretStr, field_validator, ValidationInfo
 from pydantic_settings import BaseSettings, SettingsConfigDict
-from typing import Literal
+from typing import Literal, Any
 import logging
 
 
@@ -117,6 +117,65 @@ class Settings(BaseSettings):
         gt=0,
         le=300,
         description="Timeout for external API calls (seconds)"
+    )
+    
+    # =========================================================================
+    # Cache Configuration (Redis)
+    # =========================================================================
+    
+    cache_type: Literal['memory', 'redis'] = Field(
+        default='memory',
+        description="Cache backend type (memory for single instance, redis for multi-instance)"
+    )
+    
+    redis_host: str = Field(
+        default='localhost',
+        description="Redis server hostname"
+    )
+    
+    redis_port: int = Field(
+        default=6379,
+        gt=0,
+        le=65535,
+        description="Redis server port"
+    )
+    
+    redis_db: int = Field(
+        default=0,
+        ge=0,
+        le=15,
+        description="Redis database number (0-15)"
+    )
+    
+    redis_password: SecretStr | None = Field(
+        default=None,
+        description="Redis password (None for no authentication)"
+    )
+    
+    redis_max_connections: int = Field(
+        default=10,
+        gt=0,
+        le=100,
+        description="Maximum Redis connections in the pool"
+    )
+    
+    redis_socket_timeout: float = Field(
+        default=5.0,
+        gt=0.0,
+        le=60.0,
+        description="Redis socket timeout in seconds"
+    )
+    
+    redis_socket_connect_timeout: float = Field(
+        default=5.0,
+        gt=0.0,
+        le=60.0,
+        description="Redis connection timeout in seconds"
+    )
+    
+    redis_key_prefix: str = Field(
+        default='shopping_optimizer:',
+        description="Prefix for all Redis cache keys (namespace isolation)"
     )
     
     max_concurrent_requests: int = Field(
@@ -321,6 +380,30 @@ class Settings(BaseSettings):
             'top_p': self.agent_top_p,
             'top_k': self.agent_top_k,
         }
+    
+    def get_redis_config(self) -> dict[str, Any]:
+        """
+        Get Redis configuration as a dictionary.
+        
+        Returns:
+            Dictionary with Redis connection parameters
+        """
+        from typing import Any
+        
+        config: dict[str, Any] = {
+            'host': self.redis_host,
+            'port': self.redis_port,
+            'db': self.redis_db,
+            'max_connections': self.redis_max_connections,
+            'socket_timeout': self.redis_socket_timeout,
+            'socket_connect_timeout': self.redis_socket_connect_timeout,
+            'key_prefix': self.redis_key_prefix,
+        }
+        
+        if self.redis_password:
+            config['password'] = self.redis_password.get_secret_value()
+        
+        return config
     
     def validate_required_keys(self) -> None:
         """

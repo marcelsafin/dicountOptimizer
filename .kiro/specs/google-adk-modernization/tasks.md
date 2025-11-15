@@ -247,6 +247,59 @@ Transform the Shopping Optimizer into an enterprise-grade, type-safe system usin
 
 ---
 
+## Phase 5: Deployment and Production Infrastructure
+
+- [x] 25. Implement Redis cache for multi-instance support
+  - Replace in-memory cache with Redis implementation
+  - Create redis_cache_repository.py in infrastructure/
+  - Implement async Redis client with connection pooling
+  - Add Redis health check to monitoring
+  - Support both local (in-memory) and Redis cache via configuration
+  - Add Redis connection retry logic with exponential backoff
+  - Update cache metrics to work with distributed cache
+  - _Requirements: 8.1, 8.5, 10.2_
+
+- [ ] 26. Fix frontend integration
+  - Review and update static/js/app.js for new API responses
+  - Ensure proper error handling in frontend
+  - Update UI to display new Pydantic model fields
+  - Add loading states and user feedback
+  - Test frontend with real API endpoints
+  - Fix any CORS or API compatibility issues
+  - _Requirements: 7.1, 10.3_
+
+- [ ] 27. Create CI/CD pipeline
+  - Create .github/workflows/ci.yml
+  - Add workflow for running mypy type checking
+  - Add workflow for running pytest with coverage
+  - Add workflow for linting (ruff or flake8)
+  - Add workflow for building Docker image
+  - Add workflow for deploying to Google Cloud Run
+  - Configure secrets for API keys and deployment
+  - _Requirements: 6.1, 9.5_
+
+- [ ] 28. Docker deployment configuration
+  - ✅ Dockerfile already exists - review and optimize
+  - Review docker-compose.yml for local development
+  - Add Redis service to docker-compose.yml
+  - Optimize Docker image size (multi-stage build)
+  - Add health check to Dockerfile
+  - Document Docker deployment process
+  - _Requirements: 9.5_
+
+- [ ] 29. Google Cloud Run deployment
+  - Create cloudbuild.yaml for Cloud Build
+  - Configure Cloud Run service with proper resources
+  - Set up environment variables and secrets in Cloud Run
+  - Configure Cloud Run to use Redis (Memorystore)
+  - Set up custom domain and SSL certificates
+  - Configure auto-scaling parameters
+  - Add deployment documentation
+  - Test production deployment end-to-end
+  - _Requirements: 9.5, 10.6_
+
+---
+
 ## Notes
 
 - All tasks build incrementally - complete in order
