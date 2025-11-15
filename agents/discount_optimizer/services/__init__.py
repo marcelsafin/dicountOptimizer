@@ -11,9 +11,17 @@ from .discount_matcher_service import (
     DiscountMatchingInput,
     DiscountMatchingOutput,
 )
+from .input_validation_service import (
+    InputValidationService,
+    ValidationInput,
+    ValidationOutput,
+)
 
 __all__ = [
     'DiscountMatcherService',
     'DiscountMatchingInput',
     'DiscountMatchingOutput',
+    'InputValidationService',
+    'ValidationInput',
+    'ValidationOutput',
 ]
