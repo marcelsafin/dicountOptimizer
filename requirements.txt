@@ -1,6 +1,7 @@
 google-adk
 python-dotenv
 flask
+asgiref>=3.7.0
 requests
 pydantic>=2.0.0
 pydantic-settings>=2.0.0

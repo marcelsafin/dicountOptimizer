@@ -1,67 +1,241 @@
 """
 Flask web application for Shopping Optimizer.
 Serves the frontend and provides API endpoint for optimization.
+
+This module implements the Flask API with:
+- Async support for non-blocking I/O operations
+- Integration with the new agent architecture via AgentFactory
+- Health check endpoints for monitoring
+- Proper error handling with typed responses
+- Request correlation IDs for distributed tracing
+- Structured logging throughout
+
+Requirements: 10.1, 10.3
 """
 
-from flask import Flask, render_template, request, jsonify
-from agents.discount_optimizer.agent import optimize_shopping
 import os
-from dotenv import load_dotenv
 import sys
+import uuid
+from decimal import Decimal
+from typing import Any
+
+from dotenv import load_dotenv
+from flask import Flask, render_template, request, jsonify, Response
+
+from agents.discount_optimizer.factory import AgentFactory
+from agents.discount_optimizer.agents.shopping_optimizer_agent import ShoppingOptimizerInput
+from agents.discount_optimizer.domain.exceptions import ValidationError, ShoppingOptimizerError
+from agents.discount_optimizer.logging import get_logger, set_correlation_id, LogContext
+from agents.discount_optimizer.config import settings
 
 # Load environment variables from .env file
 load_dotenv()
 
-# Validate required API credentials on startup
-def validate_api_configuration():
-    """
-    Validate that all required API credentials are configured.
-    Exits the application if critical credentials are missing.
-    """
-    required_vars = {
-        'SALLING_GROUP_API_KEY': 'Salling Group API key',
-        'GOOGLE_MAPS_API_KEY': 'Google Maps API key',
-        'GEMINI_API_KEY': 'Gemini API key',
-        'GMAIL_CREDENTIALS_PATH': 'Gmail credentials path'
-    }
-    
-    missing_vars = []
-    for var, description in required_vars.items():
-        value = os.getenv(var)
-        if not value or value.startswith('your_'):
-            missing_vars.append(f"  - {var} ({description})")
-    
-    if missing_vars:
-        print("ERROR: Missing required API configuration!", file=sys.stderr)
-        print("Please set the following environment variables in your .env file:", file=sys.stderr)
-        print("\n".join(missing_vars), file=sys.stderr)
-        print("\nRefer to .env.example for the required format.", file=sys.stderr)
-        sys.exit(1)
-    
-    # Validate Gmail credentials file exists
-    gmail_creds_path = os.getenv('GMAIL_CREDENTIALS_PATH')
-    if not os.path.exists(gmail_creds_path):
-        print(f"WARNING: Gmail credentials file not found at {gmail_creds_path}", file=sys.stderr)
-        print("Email campaign parsing will not be available until credentials are configured.", file=sys.stderr)
-    
-    print("✓ API configuration validated successfully")
+# Get logger for this module
+logger = get_logger(__name__)
 
-# Validate configuration on startup
-validate_api_configuration()
+# Initialize agent factory (singleton)
+agent_factory: AgentFactory | None = None
+
+
+def initialize_agent_factory() -> AgentFactory:
+    """
+    Initialize the agent factory with configuration validation.
+    
+    This function creates the AgentFactory singleton that will be used
+    to create agent instances for handling requests. It validates all
+    required configuration at startup.
+    
+    Returns:
+        Initialized AgentFactory instance
+    
+    Raises:
+        ValueError: If required configuration is missing
+        SystemExit: If critical configuration errors prevent startup
+    
+    Requirements: 9.3, 10.1
+    """
+    try:
+        logger.info("initializing_agent_factory", environment=settings.environment)
+        factory = AgentFactory()
+        logger.info("agent_factory_initialized_successfully")
+        return factory
+    except ValueError as e:
+        logger.error("agent_factory_initialization_failed", error=str(e))
+        print(f"ERROR: Agent factory initialization failed: {e}", file=sys.stderr)
+        print("\nPlease check your .env file and ensure all required configuration is set.", file=sys.stderr)
+        print("Refer to .env.example for the required format.", file=sys.stderr)
+        sys.exit(1)
+    except Exception as e:
+        logger.error("unexpected_error_during_initialization", error=str(e), error_type=type(e).__name__)
+        print(f"ERROR: Unexpected error during initialization: {e}", file=sys.stderr)
+        sys.exit(1)
+
+
+# Initialize factory on startup
+agent_factory = initialize_agent_factory()
 
 app = Flask(__name__)
 
 
 @app.route('/')
-def index():
+def index() -> str:
     """Serve the main page"""
     return render_template('index.html')
 
 
-@app.route('/api/optimize', methods=['POST'])
-def optimize():
+@app.route('/health', methods=['GET'])
+def health() -> tuple[Response, int] | Response:
     """
-    API endpoint for shopping optimization.
+    Basic health check endpoint.
+    
+    Returns a simple status indicating the service is running.
+    This is useful for load balancers and monitoring systems.
+    
+    Returns:
+    {
+        "status": "healthy",
+        "service": "shopping-optimizer",
+        "environment": "dev|staging|production"
+    }
+    
+    Requirements: 10.3
+    """
+    return jsonify({
+        'status': 'healthy',
+        'service': 'shopping-optimizer',
+        'environment': settings.environment,
+    })
+
+
+@app.route('/health/detailed', methods=['GET'])
+async def health_detailed() -> tuple[Response, int] | Response:
+    """
+    Detailed health check endpoint with dependency status.
+    
+    This endpoint checks the health of all critical dependencies:
+    - Geocoding service (Google Maps)
+    - Discount repository (Salling API)
+    - Cache repository
+    
+    Returns:
+    {
+        "status": "healthy|degraded|unhealthy",
+        "service": "shopping-optimizer",
+        "environment": "dev|staging|production",
+        "dependencies": {
+            "geocoding_service": {"status": "healthy|unhealthy", "message": "..."},
+            "discount_repository": {"status": "healthy|unhealthy", "message": "..."},
+            "cache_repository": {"status": "healthy|unhealthy", "message": "..."}
+        },
+        "timestamp": "2025-11-15T12:00:00Z"
+    }
+    
+    Requirements: 10.3
+    """
+    from datetime import datetime, timezone
+    
+    correlation_id = str(uuid.uuid4())
+    set_correlation_id(correlation_id)
+    
+    with LogContext(correlation_id=correlation_id, endpoint='/health/detailed'):
+        logger.info("detailed_health_check_started", correlation_id=correlation_id)
+        
+        dependencies: dict[str, dict[str, str]] = {}
+        overall_healthy = True
+        
+        # Check geocoding service
+        try:
+            geocoding_service = agent_factory.get_geocoding_service()
+            is_healthy = await geocoding_service.health_check()
+            dependencies['geocoding_service'] = {
+                'status': 'healthy' if is_healthy else 'unhealthy',
+                'message': 'Service is operational' if is_healthy else 'Service check failed'
+            }
+            if not is_healthy:
+                overall_healthy = False
+        except Exception as e:
+            logger.warning("geocoding_health_check_failed", error=str(e), correlation_id=correlation_id)
+            dependencies['geocoding_service'] = {
+                'status': 'unhealthy',
+                'message': f'Health check error: {str(e)}'
+            }
+            overall_healthy = False
+        
+        # Check discount repository
+        try:
+            discount_repo = agent_factory.get_discount_repository()
+            is_healthy = await discount_repo.health_check()
+            dependencies['discount_repository'] = {
+                'status': 'healthy' if is_healthy else 'unhealthy',
+                'message': 'Service is operational' if is_healthy else 'Service check failed'
+            }
+            if not is_healthy:
+                overall_healthy = False
+        except Exception as e:
+            logger.warning("discount_repo_health_check_failed", error=str(e), correlation_id=correlation_id)
+            dependencies['discount_repository'] = {
+                'status': 'unhealthy',
+                'message': f'Health check error: {str(e)}'
+            }
+            overall_healthy = False
+        
+        # Check cache repository
+        try:
+            cache_repo = agent_factory.get_cache_repository()
+            is_healthy = await cache_repo.health_check()
+            dependencies['cache_repository'] = {
+                'status': 'healthy' if is_healthy else 'unhealthy',
+                'message': 'Service is operational' if is_healthy else 'Service check failed'
+            }
+            if not is_healthy:
+                overall_healthy = False
+        except Exception as e:
+            logger.warning("cache_health_check_failed", error=str(e), correlation_id=correlation_id)
+            dependencies['cache_repository'] = {
+                'status': 'unhealthy',
+                'message': f'Health check error: {str(e)}'
+            }
+            overall_healthy = False
+        
+        # Determine overall status
+        unhealthy_count = sum(1 for dep in dependencies.values() if dep['status'] == 'unhealthy')
+        if unhealthy_count == 0:
+            overall_status = 'healthy'
+            status_code = 200
+        elif unhealthy_count < len(dependencies):
+            overall_status = 'degraded'
+            status_code = 200  # Still operational but degraded
+        else:
+            overall_status = 'unhealthy'
+            status_code = 503  # Service unavailable
+        
+        logger.info(
+            "detailed_health_check_completed",
+            overall_status=overall_status,
+            unhealthy_count=unhealthy_count,
+            correlation_id=correlation_id
+        )
+        
+        response = {
+            'status': overall_status,
+            'service': 'shopping-optimizer',
+            'environment': settings.environment,
+            'dependencies': dependencies,
+            'timestamp': datetime.now(timezone.utc).isoformat(),
+            'correlation_id': correlation_id,
+        }
+        
+        return jsonify(response), status_code
+
+
+@app.route('/api/optimize', methods=['POST'])
+async def optimize() -> tuple[Response, int] | Response:
+    """
+    API endpoint for shopping optimization using the new agent architecture.
+    
+    This endpoint uses async agent execution with proper error handling,
+    correlation IDs for tracing, and typed responses.
     
     Expected JSON payload:
     {
@@ -71,102 +245,207 @@ def optimize():
             "maximize_savings": true,
             "minimize_stores": false,
             "prefer_organic": false
-        }
+        },
+        "num_meals": 5  // Optional, for AI meal suggestions
     }
     
     Returns:
     {
         "success": true/false,
-        "recommendation": {...},
+        "recommendation": {
+            "purchases": [...],
+            "total_savings": 123.45,
+            "time_savings": 15.0,
+            "tips": [...],
+            "motivation_message": "...",
+            "stores": [...]
+        },
+        "user_location": {"latitude": 55.6761, "longitude": 12.5683},
+        "correlation_id": "uuid",
         "error": "error message" (if failed)
     }
+    
+    Requirements: 10.1, 10.3
     """
-    try:
-        data = request.get_json()
-        
-        if not data:
-            return jsonify({
-                'success': False,
-                'error': 'No data provided'
-            }), 400
-        
-        # Parse location
-        location_str = data.get('location', '').strip()
-        if not location_str:
-            return jsonify({
-                'success': False,
-                'error': 'Location is required'
-            }), 400
-        
-        # Try to parse as coordinates (lat,lon)
+    # Generate correlation ID for this request
+    correlation_id = str(uuid.uuid4())
+    set_correlation_id(correlation_id)
+    
+    with LogContext(correlation_id=correlation_id, endpoint='/api/optimize'):
         try:
-            parts = location_str.split(',')
-            if len(parts) == 2:
-                latitude = float(parts[0].strip())
-                longitude = float(parts[1].strip())
-            else:
-                # Default to Copenhagen if not coordinates
-                latitude = 55.6761
-                longitude = 12.5683
-        except ValueError:
-            # Default to Copenhagen if parsing fails
-            latitude = 55.6761
-            longitude = 12.5683
-        
-        # Get meals
-        meals = data.get('meals', [])
-        if not meals:
-            return jsonify({
-                'success': False,
-                'error': 'At least one meal is required'
-            }), 400
-        
-        # Get meal type filters
-        meal_types = data.get('meal_types', ['breakfast', 'lunch', 'dinner', 'snacks'])
-        
-        # Get excluded ingredients
-        excluded_ingredients = data.get('excluded_ingredients', [])
-        
-        # Get preferences
-        preferences = data.get('preferences', {})
-        maximize_savings = preferences.get('maximize_savings', False)
-        minimize_stores = preferences.get('minimize_stores', False)
-        prefer_organic = preferences.get('prefer_organic', False)
-        
-        # Validate at least one preference is selected
-        if not (maximize_savings or minimize_stores or prefer_organic):
-            return jsonify({
-                'success': False,
-                'error': 'At least one optimization preference must be selected'
-            }), 400
-        
-        # Call the optimization function
-        result = optimize_shopping(
-            latitude=latitude,
-            longitude=longitude,
-            meal_plan=meals,
-            timeframe="this week",
-            maximize_savings=maximize_savings,
-            minimize_stores=minimize_stores,
-            prefer_organic=prefer_organic,
-            meal_types=meal_types,
-            excluded_ingredients=excluded_ingredients
-        )
-        
-        # Add user location to result for map display
-        if result.get('success'):
-            result['user_location'] = {
-                'latitude': latitude,
-                'longitude': longitude
+            logger.info("api_request_received", method=request.method, correlation_id=correlation_id)
+            
+            data = request.get_json()
+            
+            if not data:
+                logger.warning("no_data_provided", correlation_id=correlation_id)
+                return jsonify({
+                    'success': False,
+                    'error': 'No data provided',
+                    'correlation_id': correlation_id
+                }), 400
+            
+            # Parse location
+            location_str = data.get('location', '').strip()
+            address: str | None = None
+            latitude: float | None = None
+            longitude: float | None = None
+            
+            if location_str:
+                # Try to parse as coordinates (lat,lon)
+                try:
+                    parts = location_str.split(',')
+                    if len(parts) == 2:
+                        latitude = float(parts[0].strip())
+                        longitude = float(parts[1].strip())
+                        logger.debug(
+                            "parsed_coordinates",
+                            latitude=latitude,
+                            longitude=longitude,
+                            correlation_id=correlation_id
+                        )
+                    else:
+                        # Treat as address
+                        address = location_str
+                        logger.debug("using_address", address=address, correlation_id=correlation_id)
+                except ValueError:
+                    # Treat as address
+                    address = location_str
+                    logger.debug("using_address", address=address, correlation_id=correlation_id)
+            
+            # Validate location provided
+            if not address and not (latitude and longitude):
+                logger.warning("location_required", correlation_id=correlation_id)
+                return jsonify({
+                    'success': False,
+                    'error': 'Location is required (either address or coordinates)',
+                    'correlation_id': correlation_id
+                }), 400
+            
+            # Get meals
+            meals = data.get('meals', [])
+            
+            # Get preferences
+            preferences = data.get('preferences', {})
+            maximize_savings = preferences.get('maximize_savings', True)
+            minimize_stores = preferences.get('minimize_stores', False)
+            prefer_organic = preferences.get('prefer_organic', False)
+            
+            # Get optional parameters
+            num_meals = data.get('num_meals', 5 if not meals else None)
+            search_radius_km = data.get('search_radius_km')
+            timeframe = data.get('timeframe', 'this week')
+            
+            # Create agent input
+            agent_input = ShoppingOptimizerInput(
+                address=address,
+                latitude=latitude,
+                longitude=longitude,
+                meal_plan=meals,
+                timeframe=timeframe,
+                maximize_savings=maximize_savings,
+                minimize_stores=minimize_stores,
+                prefer_organic=prefer_organic,
+                search_radius_km=search_radius_km,
+                num_meals=num_meals,
+                correlation_id=correlation_id,
+            )
+            
+            logger.info(
+                "agent_input_created",
+                has_address=bool(address),
+                has_coordinates=bool(latitude and longitude),
+                num_meals_in_plan=len(meals),
+                correlation_id=correlation_id
+            )
+            
+            # Create agent and run optimization
+            agent = agent_factory.create_shopping_optimizer_agent()
+            
+            # Run async agent (Flask with asgiref supports async routes)
+            recommendation = await agent.run(agent_input)
+            
+            logger.info(
+                "optimization_completed",
+                total_purchases=len(recommendation.purchases),
+                total_savings=float(recommendation.total_savings),
+                correlation_id=correlation_id
+            )
+            
+            # Convert Pydantic model to dict for JSON response
+            recommendation_dict = {
+                'purchases': [
+                    {
+                        'product_name': p.product_name,
+                        'store_name': p.store_name,
+                        'purchase_day': p.purchase_day.isoformat(),
+                        'price': float(p.price),
+                        'savings': float(p.savings),
+                        'meal_association': p.meal_association,
+                    }
+                    for p in recommendation.purchases
+                ],
+                'total_savings': float(recommendation.total_savings),
+                'time_savings': recommendation.time_savings,
+                'tips': recommendation.tips,
+                'motivation_message': recommendation.motivation_message,
+                'stores': recommendation.stores,
             }
-        
-        return jsonify(result)
-        
-    except Exception as e:
-        return jsonify({
-            'success': False,
-            'error': f'Server error: {str(e)}'
-        }), 500
+            
+            # Add user location to result for map display
+            user_location = {
+                'latitude': latitude if latitude else 0.0,
+                'longitude': longitude if longitude else 0.0,
+            }
+            
+            response = {
+                'success': True,
+                'recommendation': recommendation_dict,
+                'user_location': user_location,
+                'correlation_id': correlation_id,
+            }
+            
+            return jsonify(response)
+            
+        except ValidationError as e:
+            logger.warning(
+                "validation_error",
+                error=str(e),
+                correlation_id=correlation_id
+            )
+            return jsonify({
+                'success': False,
+                'error': f'Validation error: {str(e)}',
+                'error_type': 'validation',
+                'correlation_id': correlation_id
+            }), 400
+            
+        except ShoppingOptimizerError as e:
+            logger.error(
+                "optimization_error",
+                error=str(e),
+                correlation_id=correlation_id
+            )
+            return jsonify({
+                'success': False,
+                'error': f'Optimization error: {str(e)}',
+                'error_type': 'optimization',
+                'correlation_id': correlation_id
+            }), 500
+            
+        except Exception as e:
+            logger.error(
+                "unexpected_error",
+                error=str(e),
+                error_type=type(e).__name__,
+                correlation_id=correlation_id
+            )
+            return jsonify({
+                'success': False,
+                'error': f'Server error: {str(e)}',
+                'error_type': 'server',
+                'correlation_id': correlation_id
+            }), 500
 
 
 if __name__ == '__main__':
