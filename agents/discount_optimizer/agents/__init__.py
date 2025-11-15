@@ -11,9 +11,21 @@ from .meal_suggester_agent import (
     MealSuggestionInput,
     MealSuggestionOutput,
 )
+from .ingredient_mapper_agent import (
+    IngredientMapperAgent,
+    IngredientMappingInput,
+    IngredientMappingOutput,
+    IngredientMapping,
+    ProductMatch,
+)
 
 __all__ = [
     'MealSuggesterAgent',
     'MealSuggestionInput',
     'MealSuggestionOutput',
+    'IngredientMapperAgent',
+    'IngredientMappingInput',
+    'IngredientMappingOutput',
+    'IngredientMapping',
+    'ProductMatch',
 ]
