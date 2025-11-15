@@ -156,8 +156,6 @@ class TestIntegrationWithMockedAPIs:
                 print(f"✓ Test passed!")
                 print(f"  - Total savings: {result['total_savings']:.2f} DKK")
                 print(f"  - Number of purchases: {result['num_purchases']}")
-                
-                return True
     
     @staticmethod
     def test_salling_api_failure():
@@ -189,8 +187,6 @@ class TestIntegrationWithMockedAPIs:
             
             print(f"✓ Test passed!")
             print(f"  - Error message: {result['error']}")
-            
-            return True
     
     @staticmethod
     def test_no_products_available():
@@ -225,8 +221,6 @@ class TestIntegrationWithMockedAPIs:
                 
                 print(f"✓ Test passed!")
                 print(f"  - Error message: {result['error']}")
-                
-                return True
     
     @staticmethod
     def test_invalid_location():
@@ -253,8 +247,6 @@ class TestIntegrationWithMockedAPIs:
         
         print(f"✓ Test passed!")
         print(f"  - Error message: {result['error']}")
-        
-        return True
     
     @staticmethod
     def test_caching_behavior():
@@ -288,8 +280,6 @@ class TestIntegrationWithMockedAPIs:
         assert expired_cache is None, "Expected cache to be expired"
         
         print(f"  - Cache expiration works correctly")
-        
-        return True
     
     @staticmethod
     def test_products_expiring_today():
@@ -330,8 +320,6 @@ class TestIntegrationWithMockedAPIs:
                 # Might fail if no matching ingredients, which is acceptable
                 print(f"✓ Test passed (no matching products)!")
                 print(f"  - Error: {result['error']}")
-            
-            return True
     
     @staticmethod
     def test_very_high_discounts():
@@ -355,8 +343,6 @@ class TestIntegrationWithMockedAPIs:
         print(f"  - Original: {discount.original_price:.2f} DKK")
         print(f"  - Discount: {discount.discount_price:.2f} DKK")
         print(f"  - Savings: {expected_savings:.2f} DKK ({discount.discount_percent:.0f}%)")
-        
-        return True
     
     @staticmethod
     def test_gemini_api_failure():
@@ -397,8 +383,6 @@ class TestIntegrationWithMockedAPIs:
                     # Acceptable if no matching products for default meals
                     print(f"✓ Test passed (no matching products for fallback)!")
                     print(f"  - Error: {result['error']}")
-                
-                return True
     
     @staticmethod
     def test_cache_clear():
@@ -421,8 +405,6 @@ class TestIntegrationWithMockedAPIs:
         
         print(f"✓ Test passed!")
         print(f"  - Cache cleared successfully")
-        
-        return True
     
     @staticmethod
     def test_multiple_stores_optimization():
@@ -474,8 +456,6 @@ class TestIntegrationWithMockedAPIs:
                 print(f"✓ Test passed (partial results)!")
                 print(f"  - Minimize stores success: {result_minimize['success']}")
                 print(f"  - No minimize success: {result_no_minimize['success']}")
-            
-            return True
 
 
 def run_all_tests():
