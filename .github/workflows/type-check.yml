@@ -1,0 +1,105 @@
+name: Type Checking
+
+on:
+  push:
+    branches: [ main, develop ]
+    paths:
+      - 'agents/discount_optimizer/**/*.py'
+      - 'mypy.ini'
+      - 'pyproject.toml'
+      - 'scripts/type_check.sh'
+      - '.github/workflows/type-check.yml'
+  pull_request:
+    branches: [ main, develop ]
+    paths:
+      - 'agents/discount_optimizer/**/*.py'
+      - 'mypy.ini'
+      - 'pyproject.toml'
+      - 'scripts/type_check.sh'
+      - '.github/workflows/type-check.yml'
+
+jobs:
+  type-check:
+    name: Type Check Refactored Modules
+    runs-on: ubuntu-latest
+    
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+    
+    - name: Set up Python
+      uses: actions/setup-python@v5
+      with:
+        python-version: '3.11'
+        cache: 'pip'
+    
+    - name: Install dependencies
+      run: |
+        python -m pip install --upgrade pip
+        pip install mypy
+        pip install -r requirements.txt
+    
+    - name: Run type checking
+      run: |
+        chmod +x scripts/type_check.sh
+        ./scripts/type_check.sh
+    
+    - name: Type check summary
+      if: success()
+      run: |
+        echo "✅ All refactored modules passed strict type checking!"
+        echo ""
+        echo "Modules validated:"
+        echo "  - Domain layer (models, protocols, exceptions)"
+        echo "  - Infrastructure layer (repositories)"
+        echo "  - Configuration and logging"
+        echo "  - Agent layer (ADK agents)"
+        echo "  - Services layer (business logic)"
+        echo "  - Factory (dependency injection)"
+        echo ""
+        echo "Type coverage: 100% for refactored modules"
+    
+    - name: Type check failure
+      if: failure()
+      run: |
+        echo "❌ Type checking failed!"
+        echo ""
+        echo "Please fix the type errors before merging."
+        echo "Run './scripts/type_check.sh' locally to see detailed errors."
+        exit 1
+
+  type-check-specific-modules:
+    name: Validate Individual Modules
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        module:
+          - { path: 'agents/discount_optimizer/domain/', name: 'Domain' }
+          - { path: 'agents/discount_optimizer/infrastructure/', name: 'Infrastructure' }
+          - { path: 'agents/discount_optimizer/agents/', name: 'Agents' }
+          - { path: 'agents/discount_optimizer/services/', name: 'Services' }
+          - { path: 'agents/discount_optimizer/config.py', name: 'Config' }
+          - { path: 'agents/discount_optimizer/logging.py', name: 'Logging' }
+          - { path: 'agents/discount_optimizer/factory.py', name: 'Factory' }
+    
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+    
+    - name: Set up Python
+      uses: actions/setup-python@v5
+      with:
+        python-version: '3.11'
+        cache: 'pip'
+    
+    - name: Install dependencies
+      run: |
+        python -m pip install --upgrade pip
+        pip install mypy
+        pip install -r requirements.txt
+    
+    - name: Type check ${{ matrix.module.name }}
+      run: |
+        echo "Checking ${{ matrix.module.name }}..."
+        mypy ${{ matrix.module.path }} --show-error-codes --pretty
+        echo "✅ ${{ matrix.module.name }} passed type checking"

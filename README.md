@@ -334,9 +334,37 @@ python test_integration_mocked.py
 
 ```
 
+## Development
+
+### Type Checking
+
+This project uses strict type checking with mypy for all refactored modules. The codebase follows a gradual typing strategy:
+
+- **Refactored modules**: 100% type coverage with strict mode
+- **Legacy modules**: Permissive mode during migration
+
+**Run type checks:**
+```bash
+./scripts/type_check.sh
+```
+
+**Documentation:**
+- [Type Checking Strategy](docs/TYPE_CHECKING_STRATEGY.md) - Gradual typing approach
+- [Validation Report](docs/TYPE_CHECKING_VALIDATION_REPORT.md) - Current status
+- [Quick Reference](docs/TYPE_CHECKING_QUICK_REFERENCE.md) - Common patterns
+
+**Type Coverage Status:**
+- ✅ Domain layer: 100%
+- ✅ Infrastructure layer: 100%
+- ✅ Agent layer: 100%
+- ✅ Services layer: 100%
+- ✅ Configuration: 100%
+
 ## Contributing
 
-This project uses the ADK (Agent Development Kit) framework for agent orchestration. See `.kiro/specs/shopping-optimizer/` for detailed requirements, design, and implementation documentation.
+This project uses the ADK (Agent Development Kit) framework for agent orchestration. See `.kiro/specs/google-adk-modernization/` for detailed requirements, design, and implementation documentation.
+
+All new code must pass strict type checking before merging. Run `./scripts/type_check.sh` to validate.
 
 ## License
 

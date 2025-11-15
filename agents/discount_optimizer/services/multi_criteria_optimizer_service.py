@@ -16,7 +16,7 @@ Requirements: 2.1, 2.3, 3.1, 3.3
 
 from datetime import date
 from decimal import Decimal
-from typing import Any
+from typing import Any, Sequence
 
 from pydantic import BaseModel, Field, field_validator
 
@@ -424,13 +424,13 @@ class MultiCriteriaOptimizerService:
     
     def _parse_discount_items(
         self,
-        discount_options_data: list[dict[str, Any]]
+        discount_options_data: Sequence[dict[str, Any] | DiscountItem]
     ) -> list[DiscountItem]:
         """
         Parse discount item dictionaries into DiscountItem objects.
         
         Args:
-            discount_options_data: List of discount item dictionaries
+            discount_options_data: List of discount item dictionaries or DiscountItem objects
         
         Returns:
             List of validated DiscountItem objects
