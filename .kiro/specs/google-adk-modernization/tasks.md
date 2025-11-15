@@ -119,7 +119,7 @@ Transform the Shopping Optimizer into an enterprise-grade, type-safe system usin
   - Add logging for mapping decisions
   - _Requirements: 2.1, 2.3, 3.1, 3.3_
 
-- [ ] 12. Create DiscountMatcher ADK agent
+- [x] 12. Create DiscountMatcher ADK agent
   - Create discount_matcher_agent.py
   - Define DiscountMatchingInput Pydantic model
   - Define DiscountMatchingOutput Pydantic model
