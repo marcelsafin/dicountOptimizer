@@ -23,6 +23,10 @@ from .output_formatter_agent import (
     FormattingInput,
     FormattingOutput,
 )
+from .shopping_optimizer_agent import (
+    ShoppingOptimizerAgent,
+    ShoppingOptimizerInput,
+)
 
 __all__ = [
     'MealSuggesterAgent',
@@ -36,4 +40,6 @@ __all__ = [
     'OutputFormatterAgent',
     'FormattingInput',
     'FormattingOutput',
+    'ShoppingOptimizerAgent',
+    'ShoppingOptimizerInput',
 ]
