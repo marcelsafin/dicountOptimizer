@@ -11,6 +11,14 @@ The Shopping Optimizer fetches real-time food waste discounts from major Danish 
 - **Simplify shopping**: Get meal ideas based on what's actually available nearby
 - **Support local**: Only shows stores within 2km (walking/biking distance)
 
+## ⚠️ CRITICAL: Async Server Required
+
+**This application MUST be run with Gunicorn + Uvicorn workers.** 
+
+DO NOT use `python app.py` or `flask run` - these are blocking, single-threaded development servers that will destroy all async performance optimizations from Phase 2 (Requirements 8.2, 8.6).
+
+See [Deployment Guide](docs/DEPLOYMENT_GUIDE.md) for complete instructions.
+
 ## Quick Start
 
 ### 1. Install Dependencies
@@ -72,12 +80,49 @@ GOOGLE_API_KEY=your_gemini_api_key_here
 
 ### 3. Run the Application
 
+**⚠️ IMPORTANT**: This application uses async/await throughout (Requirements 8.2, 8.6). You MUST use an ASGI server (Gunicorn + Uvicorn) to preserve async performance. Never use `python app.py` or `flask run` - these are blocking, single-threaded servers that will destroy all performance optimizations.
+
+#### Local Development
+
 ```bash
-# Start Flask web server
-python app.py
+# Install production server dependencies (if not already installed)
+pip install gunicorn uvicorn[standard]
+
+# Start with Gunicorn + Uvicorn worker (async-capable)
+gunicorn app:app \
+  --worker-class uvicorn.workers.UvicornWorker \
+  --bind 0.0.0.0:3000 \
+  --reload
+
+# Or use the shorthand:
+gunicorn app:app -k uvicorn.workers.UvicornWorker -b 0.0.0.0:3000 --reload
 ```
 
-Open your browser at: http://127.0.0.1:8000
+Open your browser at: **http://127.0.0.1:3000**
+
+#### Production Deployment
+
+```bash
+# Production configuration with multiple workers
+gunicorn app:app \
+  --worker-class uvicorn.workers.UvicornWorker \
+  --workers 4 \
+  --bind 0.0.0.0:$PORT \
+  --timeout 120 \
+  --graceful-timeout 30 \
+  --access-logfile - \
+  --error-logfile - \
+  --log-level info
+```
+
+**Why Gunicorn + Uvicorn?**
+- **Gunicorn**: Process manager with multiple workers for load balancing
+- **Uvicorn**: ASGI server that supports async/await natively
+- **Together**: Enterprise-grade async performance with proper concurrency
+
+**Performance Impact**:
+- ❌ `python app.py`: Single-threaded, blocking I/O (~1 req/sec)
+- ✅ Gunicorn + Uvicorn: Multi-worker, async I/O (~100+ req/sec)
 
 ## How to Use
 

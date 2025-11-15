@@ -1,0 +1,60 @@
+# Docker Compose for local development
+# Includes Redis for testing production cache (Task 25)
+#
+# Usage:
+#   docker-compose up -d        # Start services
+#   docker-compose logs -f app  # View logs
+#   docker-compose down         # Stop services
+
+version: '3.8'
+
+services:
+  # Redis cache (for Task 25 - production cache)
+  redis:
+    image: redis:7-alpine
+    container_name: shopping-optimizer-redis
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis-data:/data
+    command: redis-server --appendonly yes
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 3s
+      retries: 3
+
+  # Shopping Optimizer application
+  app:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: shopping-optimizer-app
+    ports:
+      - "3000:3000"
+    environment:
+      - PORT=3000
+      - ENVIRONMENT=dev
+      - REDIS_URL=redis://redis:6379/0
+      # Load other env vars from .env file
+    env_file:
+      - .env
+    depends_on:
+      redis:
+        condition: service_healthy
+    volumes:
+      # Mount code for hot reload in development
+      - ./agents:/app/agents
+      - ./templates:/app/templates
+      - ./static:/app/static
+      - ./app.py:/app/app.py
+    healthcheck:
+      test: ["CMD", "python", "-c", "import requests; requests.get('http://localhost:3000/health')"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
+
+volumes:
+  redis-data:
+    driver: local

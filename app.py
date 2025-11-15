@@ -554,6 +554,13 @@ def metrics_prometheus() -> tuple[str, int, dict[str, str]]:
         return f"# Error exporting metrics: {str(e)}\n", 500, {'Content-Type': 'text/plain; charset=utf-8'}
 
 
-if __name__ == '__main__':
-    port = int(os.environ.get('PORT', 3000))
-    app.run(host='0.0.0.0', port=port, debug=True)
+# ASGI application entry point for production servers (Gunicorn/Uvicorn)
+# Do NOT use app.run() - this is a blocking, single-threaded development server
+# that defeats all async performance optimizations from Phase 2 (Req 8.2, 8.6)
+#
+# For local development, use:
+#   gunicorn app:app --worker-class uvicorn.workers.UvicornWorker --bind 0.0.0.0:3000
+#
+# For production, use:
+#   gunicorn app:app --worker-class uvicorn.workers.UvicornWorker \
+#     --workers 4 --bind 0.0.0.0:$PORT --timeout 120 --graceful-timeout 30
