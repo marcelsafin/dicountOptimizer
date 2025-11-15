@@ -18,6 +18,11 @@ from .ingredient_mapper_agent import (
     IngredientMapping,
     ProductMatch,
 )
+from .output_formatter_agent import (
+    OutputFormatterAgent,
+    FormattingInput,
+    FormattingOutput,
+)
 
 __all__ = [
     'MealSuggesterAgent',
@@ -28,4 +33,7 @@ __all__ = [
     'IngredientMappingOutput',
     'IngredientMapping',
     'ProductMatch',
+    'OutputFormatterAgent',
+    'FormattingInput',
+    'FormattingOutput',
 ]
