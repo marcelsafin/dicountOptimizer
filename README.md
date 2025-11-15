@@ -127,57 +127,122 @@ This system specifically targets **food waste products** - items that stores nee
 
 ## System Architecture
 
+### Architecture Overview
+
+The Shopping Optimizer follows a modern, enterprise-grade architecture using **Google ADK (Agent Development Kit)** with comprehensive type safety, dependency injection, and clean separation of concerns. The system is built on four distinct layers:
+
+```
+┌─────────────────────────────────────────────────────────┐
+│              Presentation Layer                          │
+│  (Flask API, CLI, Web UI)                               │
+└─────────────────────────────────────────────────────────┘
+                         ↓
+┌─────────────────────────────────────────────────────────┐
+│              Agent Layer (Google ADK)                    │
+│  ┌──────────────┐  ┌──────────────┐  ┌──────────────┐ │
+│  │ MealSuggester│  │IngredientMap │  │OutputFormatter│ │
+│  │    Agent     │  │    Agent     │  │    Agent      │ │
+│  └──────────────┘  └──────────────┘  └──────────────┘ │
+│                                                          │
+│  ┌──────────────────────────────────────────────────┐  │
+│  │     ShoppingOptimizerAgent (Root Agent)          │  │
+│  │  Orchestrates all sub-agents with DI             │  │
+│  └──────────────────────────────────────────────────┘  │
+└─────────────────────────────────────────────────────────┘
+                         ↓
+┌─────────────────────────────────────────────────────────┐
+│              Business Logic Layer                        │
+│  (Services, Domain Models, Validation)                  │
+│  - InputValidationService                               │
+│  - DiscountMatcherService                               │
+│  - MultiCriteriaOptimizerService                        │
+└─────────────────────────────────────────────────────────┘
+                         ↓
+┌─────────────────────────────────────────────────────────┐
+│              Infrastructure Layer                        │
+│  ┌──────────────┐  ┌──────────────┐  ┌──────────────┐ │
+│  │ Salling API  │  │ Google Maps  │  │   Cache      │ │
+│  │  Repository  │  │  Repository  │  │  Repository  │ │
+│  └──────────────┘  └──────────────┘  └──────────────┘ │
+└─────────────────────────────────────────────────────────┘
+```
+
+### Agent Composition Pattern
+
+The root `ShoppingOptimizerAgent` composes specialized sub-agents using **dependency injection**:
+
+```
+ShoppingOptimizerAgent (Root)
+├── InputValidationService (validates user input)
+├── DiscountMatcherService (fetches and filters discounts)
+├── MealSuggesterAgent (AI meal suggestions via Gemini)
+├── IngredientMapperAgent (maps meals to products)
+├── MultiCriteriaOptimizerService (optimizes purchases)
+└── OutputFormatterAgent (formats recommendations)
+```
+
+Each agent:
+- Has a **single responsibility** (SOLID principles)
+- Uses **typed tool functions** with Pydantic models
+- Validates **inputs/outputs** automatically
+- Can be **tested independently**
+- Implements **retry and error handling**
+- Supports **graceful fallbacks**
+
 ### High-Level Workflow
 
 ```
-User Location Input
+User Input (address or coordinates)
     ↓
-Input Validation (coordinates, 2km radius)
+Input Validation (location, timeframe, preferences)
     ↓
-Salling Group API (fetch food waste within 2km)
+Discount Matching (fetch from Salling API, filter by distance)
     ↓
-Distance Calculation (Haversine formula)
+Meal Suggestion (AI-powered via Gemini OR use provided meal plan)
     ↓
-Gemini 2.5 Pro API (generate meal suggestions)
+Ingredient Mapping (map meals to available products)
     ↓
-Savings Calculation
+Multi-Criteria Optimization (select best purchases)
     ↓
-Output Formatting
+Output Formatting (tips, motivation, store summary)
     ↓
 Display Results to User
 ```
 
-### Component Architecture
-
-**Presentation Layer**:
-- Flask web server (`app.py`)
-- HTML/CSS/JavaScript frontend (`templates/`, `static/`)
-
-**Agent Layer**:
-- ADK agent orchestration (`agents/discount_optimizer/agent.py`)
-- Workflow coordination and error handling
-
-**Integration Layer**:
-- `SallingAPIClient`: Fetches food waste data with 24h caching
-- `MealSuggester`: Interfaces with Gemini 2.5 Pro for AI meal generation
-
-**Business Logic Layer**:
-- `InputValidator`: Validates location coordinates
-- `DiscountMatcher`: Filters products by distance, sorts by proximity
-- `SavingsCalculator`: Calculates total savings and generates insights
-- `OutputFormatter`: Formats results for display
-
-**Data Layer**:
-- In-memory cache (24h TTL) for API responses
-- Data models: `UserInput`, `Location`, `DiscountItem`, `MealSuggestion`
-
 ### Key Technologies
 
-- **Backend**: Python 3.9+, Flask, ADK (Agent Development Kit)
-- **AI**: Google Gemini 2.5 Pro for meal generation
-- **APIs**: Salling Group Food Waste API
+- **Backend**: Python 3.11+, Flask, Google ADK
+- **Type Safety**: Pydantic, mypy strict mode, Protocol classes
+- **AI**: Google Gemini 2.0 Flash for agent functionality
+- **APIs**: Salling Group Food Waste API, Google Maps API
+- **Architecture**: Dependency Injection, Repository Pattern, Factory Pattern
+- **Async**: httpx with connection pooling, async/await throughout
+- **Caching**: In-memory cache with TTL
+- **Logging**: Structured logging with correlation IDs
 - **Frontend**: Vanilla JavaScript, HTML5, CSS3
-- **Distance Calculation**: Haversine formula
+
+### Type Safety
+
+The codebase achieves **100% type coverage** in all refactored modules using:
+
+- **Pydantic models** for all data structures with validation
+- **Protocol classes** for dependency injection interfaces
+- **mypy strict mode** for static type checking
+- **Gradual typing strategy** for legacy code migration
+
+See [Type Checking Documentation](docs/TYPE_CHECKING_STRATEGY.md) for details.
+
+### Configuration Management
+
+All configuration is managed through **Pydantic Settings** with:
+
+- Environment variable validation
+- Type-safe access to all settings
+- Secrets management (SecretStr for API keys)
+- Feature flags for gradual rollout
+- Environment-specific configuration (dev/staging/production)
+
+See [Configuration Guide](#configuration) for details.
 
 ## Troubleshooting
 
@@ -314,25 +379,111 @@ python test_integration_mocked.py
 .
 ├── agents/
 │   └── discount_optimizer/
-│       ├── agent.py                    # Main ADK agent orchestration
-│       ├── salling_api_client.py       # Salling Group API integration
-│       ├── meal_suggester.py           # Gemini AI meal generation
-│       ├── discount_matcher.py         # Distance filtering & sorting
-│       ├── input_validator.py          # Input validation
-│       ├── savings_calculator.py       # Savings calculations
-│       ├── output_formatter.py         # Result formatting
-│       └── models.py                   # Data models
+│       ├── agents/                     # Google ADK Agents
+│       │   ├── shopping_optimizer_agent.py    # Root orchestration agent
+│       │   ├── meal_suggester_agent.py        # AI meal suggestions
+│       │   ├── ingredient_mapper_agent.py     # Ingredient-to-product mapping
+│       │   └── output_formatter_agent.py      # Output formatting
+│       ├── services/                   # Business Logic Services
+│       │   ├── input_validation_service.py    # Input validation
+│       │   ├── discount_matcher_service.py    # Discount fetching/filtering
+│       │   └── multi_criteria_optimizer_service.py  # Purchase optimization
+│       ├── infrastructure/             # External API Repositories
+│       │   ├── salling_repository.py          # Salling Group API client
+│       │   ├── google_maps_repository.py      # Google Maps API client
+│       │   └── cache_repository.py            # In-memory cache
+│       ├── domain/                     # Domain Models & Protocols
+│       │   ├── models.py                      # Pydantic data models
+│       │   ├── protocols.py                   # Protocol interfaces
+│       │   └── exceptions.py                  # Typed exceptions
+│       ├── factory.py                  # Agent factory (DI)
+│       ├── config.py                   # Configuration management
+│       └── logging.py                  # Structured logging
 ├── templates/
 │   └── index.html                      # Web UI template
 ├── static/
 │   ├── css/styles.css                  # UI styling
 │   └── js/app.js                       # Frontend logic
+├── tests/                              # Comprehensive test suite
+│   ├── agents/                         # Agent tests
+│   ├── services/                       # Service tests
+│   ├── integration/                    # Integration tests
+│   └── observability/                  # Monitoring tests
+├── docs/                               # Documentation
+│   ├── API_REFERENCE.md                # Complete API reference
+│   ├── MIGRATION_GUIDE.md              # Migration guide
+│   ├── TYPE_CHECKING_STRATEGY.md       # Type checking approach
+│   ├── TYPE_CHECKING_VALIDATION_REPORT.md  # Type coverage status
+│   └── TYPE_CHECKING_QUICK_REFERENCE.md    # Quick reference
+├── examples/                           # Usage examples
+│   ├── agent_composition_example.py    # Agent composition patterns
+│   └── factory_usage_example.py        # Factory usage
+├── .kiro/specs/google-adk-modernization/  # Spec documentation
+│   ├── requirements.md                 # Requirements (EARS format)
+│   ├── design.md                       # Architecture design
+│   └── tasks.md                        # Implementation tasks
 ├── app.py                              # Flask web server
 ├── requirements.txt                    # Python dependencies
+├── mypy.ini                            # Type checking configuration
 ├── .env                                # API keys (not in git)
 └── .env.example                        # Example configuration
-
 ```
+
+### Key Directories
+
+**`agents/discount_optimizer/agents/`**: Google ADK agents with single responsibilities
+- Each agent is independently testable
+- Uses typed tool functions with Pydantic models
+- Implements retry and error handling
+
+**`agents/discount_optimizer/services/`**: Business logic services
+- Stateless services for specific tasks
+- No external dependencies (injected via constructor)
+- Pure business logic without I/O
+
+**`agents/discount_optimizer/infrastructure/`**: External API clients
+- Repository pattern for API abstraction
+- Async/await with connection pooling
+- Automatic retry with exponential backoff
+
+**`agents/discount_optimizer/domain/`**: Core domain models
+- Pydantic models with comprehensive validation
+- Protocol interfaces for dependency injection
+- Typed exception hierarchy
+
+**`docs/`**: Comprehensive documentation
+- API reference for all models and agents
+- Migration guide from legacy code
+- Type checking strategy and validation reports
+
+**`examples/`**: Working code examples
+- Agent composition patterns
+- Factory usage
+- Error handling
+- Testing with mocks
+
+## Documentation
+
+### Complete Documentation Suite
+
+- **[Quick Start Guide](docs/QUICK_START.md)**: Get up and running in 5 minutes
+- **[API Reference](docs/API_REFERENCE.md)**: Complete API documentation for all models, agents, services, and repositories
+- **[Architecture Guide](docs/ARCHITECTURE.md)**: Detailed architecture documentation with diagrams and design patterns
+- **[Migration Guide](docs/MIGRATION_GUIDE.md)**: Step-by-step guide for migrating from legacy code to modern ADK architecture
+- **[Type Checking Strategy](docs/TYPE_CHECKING_STRATEGY.md)**: Gradual typing approach and best practices
+- **[Type Checking Validation Report](docs/TYPE_CHECKING_VALIDATION_REPORT.md)**: Current type coverage status
+- **[Type Checking Quick Reference](docs/TYPE_CHECKING_QUICK_REFERENCE.md)**: Common type checking patterns
+
+### Specification Documents
+
+- **[Requirements](/.kiro/specs/google-adk-modernization/requirements.md)**: Detailed requirements in EARS format
+- **[Design](/.kiro/specs/google-adk-modernization/design.md)**: Architecture design document
+- **[Tasks](/.kiro/specs/google-adk-modernization/tasks.md)**: Implementation task list
+
+### Code Examples
+
+- **[Agent Composition Example](examples/agent_composition_example.py)**: Comprehensive examples of agent usage patterns
+- **[Factory Usage Example](examples/factory_usage_example.py)**: Dependency injection and factory patterns
 
 ## Development
 
@@ -348,11 +499,6 @@ This project uses strict type checking with mypy for all refactored modules. The
 ./scripts/type_check.sh
 ```
 
-**Documentation:**
-- [Type Checking Strategy](docs/TYPE_CHECKING_STRATEGY.md) - Gradual typing approach
-- [Validation Report](docs/TYPE_CHECKING_VALIDATION_REPORT.md) - Current status
-- [Quick Reference](docs/TYPE_CHECKING_QUICK_REFERENCE.md) - Common patterns
-
 **Type Coverage Status:**
 - ✅ Domain layer: 100%
 - ✅ Infrastructure layer: 100%
@@ -360,11 +506,238 @@ This project uses strict type checking with mypy for all refactored modules. The
 - ✅ Services layer: 100%
 - ✅ Configuration: 100%
 
+## Agent Usage Examples
+
+### Basic Usage with Factory
+
+The simplest way to use the Shopping Optimizer is through the factory:
+
+```python
+from agents.discount_optimizer.factory import create_production_agent
+from agents.discount_optimizer.agents.shopping_optimizer_agent import ShoppingOptimizerInput
+
+# Create agent with all dependencies wired
+agent = create_production_agent()
+
+# Create input
+input_data = ShoppingOptimizerInput(
+    address="Nørrebrogade 20, Copenhagen",
+    meal_plan=[],  # Empty for AI suggestions
+    timeframe="this week",
+    maximize_savings=True,
+    num_meals=5
+)
+
+# Run optimization
+recommendation = await agent.run(input_data)
+
+# Access results
+print(f"Total savings: {recommendation.total_savings} kr")
+print(f"Stores to visit: {len(recommendation.stores)}")
+for purchase in recommendation.purchases:
+    print(f"- {purchase.product_name} at {purchase.store_name}: {purchase.price} kr")
+```
+
+### Using Coordinates Instead of Address
+
+```python
+input_data = ShoppingOptimizerInput(
+    latitude=55.6761,
+    longitude=12.5683,
+    meal_plan=["Taco", "Pasta Carbonara", "Greek Salad"],
+    timeframe="next 3 days",
+    maximize_savings=True,
+    minimize_stores=True
+)
+
+recommendation = await agent.run(input_data)
+```
+
+### Custom Configuration
+
+```python
+from agents.discount_optimizer.factory import AgentFactory
+from agents.discount_optimizer.config import Settings
+
+# Create custom settings
+custom_settings = Settings(
+    agent_temperature=0.9,  # More creative suggestions
+    cache_ttl_seconds=7200,  # 2-hour cache
+    max_stores_per_recommendation=2,  # Limit to 2 stores
+    enable_ai_meal_suggestions=True
+)
+
+# Create factory with custom settings
+factory = AgentFactory(config=custom_settings)
+agent = factory.create_shopping_optimizer_agent()
+
+# Use agent as normal
+recommendation = await agent.run(input_data)
+```
+
+### Testing with Mocks
+
+```python
+from agents.discount_optimizer.factory import create_test_agent
+from agents.discount_optimizer.domain.protocols import GeocodingService, DiscountRepository
+
+# Create mock implementations
+class MockGeocodingService:
+    async def geocode_address(self, address: str):
+        return Location(latitude=55.6761, longitude=12.5683)
+    
+    async def calculate_distance(self, origin, destination):
+        return 1.5  # km
+
+class MockDiscountRepository:
+    async def fetch_discounts(self, location, radius_km):
+        return [
+            DiscountItem(
+                product_name="Organic Milk",
+                store_name="Føtex",
+                # ... other fields
+            )
+        ]
+    
+    async def health_check(self):
+        return True
+
+# Create agent with mocks
+agent = create_test_agent(
+    geocoding_service=MockGeocodingService(),
+    discount_repository=MockDiscountRepository()
+)
+
+# Test with mocked dependencies
+recommendation = await agent.run(input_data)
+```
+
+### Error Handling
+
+```python
+from agents.discount_optimizer.domain.exceptions import (
+    ValidationError,
+    APIError,
+    ShoppingOptimizerError
+)
+
+try:
+    recommendation = await agent.run(input_data)
+except ValidationError as e:
+    print(f"Invalid input: {e}")
+    # Handle validation errors (bad coordinates, invalid dates, etc.)
+except APIError as e:
+    print(f"API call failed: {e}")
+    # Handle external API failures (Salling API, Google Maps, etc.)
+except ShoppingOptimizerError as e:
+    print(f"Optimization failed: {e}")
+    # Handle general optimization errors
+```
+
+### Accessing Individual Agents
+
+You can also use individual agents directly:
+
+```python
+from agents.discount_optimizer.agents.meal_suggester_agent import (
+    MealSuggesterAgent,
+    MealSuggestionInput
+)
+
+# Create meal suggester agent
+meal_suggester = MealSuggesterAgent(api_key="your-api-key")
+
+# Suggest meals
+input_data = MealSuggestionInput(
+    available_products=["tortillas", "hakket oksekød", "ost", "tomater"],
+    num_meals=3,
+    meal_types=["lunch", "dinner"]
+)
+
+result = await meal_suggester.run(input_data)
+print(f"Suggested meals: {result.suggested_meals}")
+print(f"Reasoning: {result.reasoning}")
+```
+
+## Configuration
+
+### Environment Variables
+
+Create a `.env` file in the project root:
+
+```bash
+# Required
+GOOGLE_API_KEY=your_gemini_api_key_here
+SALLING_GROUP_API_KEY=your_salling_api_key_here
+
+# Optional - Environment
+ENVIRONMENT=dev  # dev, staging, or production
+DEBUG=false
+
+# Optional - Agent Configuration
+AGENT_MODEL=gemini-2.0-flash-exp
+AGENT_TEMPERATURE=0.7
+AGENT_MAX_TOKENS=2000
+
+# Optional - Performance
+CACHE_TTL_SECONDS=3600
+API_TIMEOUT_SECONDS=30
+MAX_CONCURRENT_REQUESTS=10
+
+# Optional - Feature Flags
+ENABLE_AI_MEAL_SUGGESTIONS=true
+ENABLE_CACHING=true
+ENABLE_METRICS=true
+
+# Optional - Logging
+LOG_LEVEL=INFO
+LOG_FORMAT=console  # console, json, or text
+
+# Optional - Business Logic
+DEFAULT_SEARCH_RADIUS_KM=5.0
+MAX_STORES_PER_RECOMMENDATION=3
+MIN_DISCOUNT_PERCENT=10.0
+```
+
+### Configuration in Code
+
+```python
+from agents.discount_optimizer.config import settings
+
+# Access configuration
+print(f"Using model: {settings.agent_model}")
+print(f"Cache TTL: {settings.cache_ttl_seconds} seconds")
+print(f"Environment: {settings.environment}")
+
+# Check feature flags
+if settings.enable_ai_meal_suggestions:
+    print("AI meal suggestions enabled")
+
+# Get agent configuration
+agent_config = settings.get_agent_config()
+# Returns: {'temperature': 0.7, 'max_output_tokens': 2000, ...}
+
+# Check environment
+if settings.is_production():
+    print("Running in production mode")
+```
+
 ## Contributing
 
 This project uses the ADK (Agent Development Kit) framework for agent orchestration. See `.kiro/specs/google-adk-modernization/` for detailed requirements, design, and implementation documentation.
 
 All new code must pass strict type checking before merging. Run `./scripts/type_check.sh` to validate.
+
+### Development Guidelines
+
+1. **Type Safety**: All new code must have 100% type coverage with mypy strict mode
+2. **Pydantic Models**: Use Pydantic for all data structures with validation
+3. **Dependency Injection**: Inject all dependencies via constructors
+4. **Async/Await**: Use async/await for all I/O operations
+5. **Error Handling**: Use typed exceptions from `domain.exceptions`
+6. **Logging**: Use structured logging with correlation IDs
+7. **Testing**: Write tests alongside implementation
+8. **Documentation**: Add docstrings with examples for all public methods
 
 ## License
 
