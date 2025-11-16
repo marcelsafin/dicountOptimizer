@@ -2,14 +2,25 @@
 # Includes Redis for testing production cache (Task 25)
 #
 # Usage:
-#   docker-compose up -d        # Start services
-#   docker-compose logs -f app  # View logs
-#   docker-compose down         # Stop services
+#   docker-compose up -d              # Start all services in background
+#   docker-compose up                 # Start with logs in foreground
+#   docker-compose logs -f app        # View app logs
+#   docker-compose logs -f redis      # View Redis logs
+#   docker-compose ps                 # Check service status
+#   docker-compose down               # Stop and remove containers
+#   docker-compose down -v            # Stop and remove containers + volumes
+#
+# Development workflow:
+#   1. Copy .env.example to .env and configure API keys
+#   2. Run: docker-compose up -d
+#   3. Access app at http://localhost:3000
+#   4. Access Redis at localhost:6379
+#   5. Code changes auto-reload (volumes mounted)
 
 version: '3.8'
 
 services:
-  # Redis cache (for Task 25 - production cache)
+  # Redis cache (for production-like caching)
   redis:
     image: redis:7-alpine
     container_name: shopping-optimizer-redis
@@ -17,26 +28,46 @@ services:
       - "6379:6379"
     volumes:
       - redis-data:/data
-    command: redis-server --appendonly yes
+    command: redis-server --appendonly yes --maxmemory 256mb --maxmemory-policy allkeys-lru
     healthcheck:
       test: ["CMD", "redis-cli", "ping"]
       interval: 10s
       timeout: 3s
       retries: 3
+      start_period: 5s
+    restart: unless-stopped
+    networks:
+      - shopping-optimizer-network
 
   # Shopping Optimizer application
   app:
     build:
       context: .
       dockerfile: Dockerfile
+      # Use cache for faster rebuilds
+      cache_from:
+        - shopping-optimizer:latest
+    image: shopping-optimizer:latest
     container_name: shopping-optimizer-app
     ports:
       - "3000:3000"
     environment:
+      # Application settings
       - PORT=3000
       - ENVIRONMENT=dev
+      - LOG_LEVEL=INFO
+      - WORKERS=2
+      
+      # Redis configuration
       - REDIS_URL=redis://redis:6379/0
-      # Load other env vars from .env file
+      - CACHE_TTL_SECONDS=3600
+      
+      # Feature flags
+      - ENABLE_AI_MEAL_SUGGESTIONS=true
+      - ENABLE_CACHING=true
+      - ENABLE_METRICS=true
+      
+      # Load other env vars from .env file (API keys, etc.)
     env_file:
       - .env
     depends_on:
@@ -44,17 +75,25 @@ services:
         condition: service_healthy
     volumes:
       # Mount code for hot reload in development
+      # Remove these in production
       - ./agents:/app/agents
       - ./templates:/app/templates
       - ./static:/app/static
       - ./app.py:/app/app.py
     healthcheck:
-      test: ["CMD", "python", "-c", "import requests; requests.get('http://localhost:3000/health')"]
+      test: ["CMD", "curl", "-f", "http://localhost:3000/health"]
       interval: 30s
       timeout: 10s
       retries: 3
       start_period: 40s
+    restart: unless-stopped
+    networks:
+      - shopping-optimizer-network
 
 volumes:
   redis-data:
     driver: local
+
+networks:
+  shopping-optimizer-network:
+    driver: bridge

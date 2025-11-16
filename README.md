@@ -21,7 +21,27 @@ See [Deployment Guide](docs/DEPLOYMENT_GUIDE.md) for complete instructions.
 
 ## Quick Start
 
-### 1. Install Dependencies
+### Option 1: Docker (Recommended)
+
+The fastest way to get started is with Docker:
+
+```bash
+# 1. Configure environment
+cp .env.example .env
+# Edit .env and add your GOOGLE_API_KEY
+
+# 2. Start services (app + Redis)
+docker-compose up -d
+
+# 3. Access the app
+open http://localhost:3000
+```
+
+See [Docker Quick Start](DOCKER_QUICK_START.md) for more details or [Docker Deployment Guide](docs/DOCKER_DEPLOYMENT.md) for production deployment.
+
+### Option 2: Local Installation
+
+#### 1. Install Dependencies
 
 ```bash
 # Create virtual environment
@@ -34,9 +54,9 @@ source .venv/bin/activate  # On macOS/Linux
 pip install -r requirements.txt
 ```
 
-### 2. Get API Keys
+#### 2. Get API Keys
 
-#### Salling Group API (Required)
+##### Salling Group API (Required)
 
 The Salling Group API provides real-time food waste data from Danish grocery stores.
 
@@ -52,7 +72,7 @@ The Salling Group API provides real-time food waste data from Danish grocery sto
 - Coverage: Netto, Føtex, Bilka, BR stores in Denmark
 - Documentation: https://developer.sallinggroup.com/api-reference#food-waste-api
 
-#### Google Gemini API (Required)
+##### Google Gemini API (Required)
 
 Gemini 2.5 Pro generates creative meal suggestions based on available products.
 
@@ -67,7 +87,7 @@ Gemini 2.5 Pro generates creative meal suggestions based on available products.
 - Used for: AI meal generation and recipe suggestions
 - Documentation: https://ai.google.dev/gemini-api/docs
 
-#### Configure Environment Variables
+##### Configure Environment Variables
 
 Create or update the `.env` file in the project root:
 
@@ -78,11 +98,11 @@ GOOGLE_API_KEY=your_gemini_api_key_here
 
 **Security Note**: Never share your API keys publicly! The `.env` file is already in `.gitignore`.
 
-### 3. Run the Application
+#### 3. Run the Application
 
 **⚠️ IMPORTANT**: This application uses async/await throughout (Requirements 8.2, 8.6). You MUST use an ASGI server (Gunicorn + Uvicorn) to preserve async performance. Never use `python app.py` or `flask run` - these are blocking, single-threaded servers that will destroy all performance optimizations.
 
-#### Local Development
+##### Local Development
 
 ```bash
 # Install production server dependencies (if not already installed)
@@ -100,7 +120,7 @@ gunicorn app:app -k uvicorn.workers.UvicornWorker -b 0.0.0.0:3000 --reload
 
 Open your browser at: **http://127.0.0.1:3000**
 
-#### Production Deployment
+##### Production Deployment
 
 ```bash
 # Production configuration with multiple workers
@@ -511,6 +531,8 @@ python test_integration_mocked.py
 
 ### Complete Documentation Suite
 
+- **[Docker Quick Start](DOCKER_QUICK_START.md)**: Get started with Docker in 5 minutes
+- **[Docker Deployment Guide](docs/DOCKER_DEPLOYMENT.md)**: Complete Docker deployment documentation for local development and production
 - **[Quick Start Guide](docs/QUICK_START.md)**: Get up and running in 5 minutes
 - **[API Reference](docs/API_REFERENCE.md)**: Complete API documentation for all models, agents, services, and repositories
 - **[Architecture Guide](docs/ARCHITECTURE.md)**: Detailed architecture documentation with diagrams and design patterns
