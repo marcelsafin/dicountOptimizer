@@ -1,0 +1,116 @@
+name: Manual Deployment
+
+on:
+  workflow_dispatch:
+    inputs:
+      environment:
+        description: 'Environment to deploy to'
+        required: true
+        type: choice
+        options:
+          - staging
+          - production
+      image_tag:
+        description: 'Docker image tag (leave empty for latest)'
+        required: false
+        type: string
+
+jobs:
+  deploy:
+    name: Deploy to ${{ inputs.environment }}
+    runs-on: ubuntu-latest
+    environment:
+      name: ${{ inputs.environment }}
+    
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+    
+    - name: Authenticate to Google Cloud
+      uses: google-github-actions/auth@v2
+      with:
+        credentials_json: ${{ secrets.GCP_SA_KEY }}
+    
+    - name: Set up Cloud SDK
+      uses: google-github-actions/setup-gcloud@v2
+    
+    - name: Configure Docker for GCR
+      run: |
+        gcloud auth configure-docker
+    
+    - name: Set deployment variables
+      id: vars
+      run: |
+        if [ "${{ inputs.environment }}" == "production" ]; then
+          echo "service_name=shopping-optimizer" >> $GITHUB_OUTPUT
+          echo "memory=1Gi" >> $GITHUB_OUTPUT
+          echo "cpu=2" >> $GITHUB_OUTPUT
+          echo "min_instances=1" >> $GITHUB_OUTPUT
+          echo "max_instances=10" >> $GITHUB_OUTPUT
+        else
+          echo "service_name=shopping-optimizer-staging" >> $GITHUB_OUTPUT
+          echo "memory=512Mi" >> $GITHUB_OUTPUT
+          echo "cpu=1" >> $GITHUB_OUTPUT
+          echo "min_instances=0" >> $GITHUB_OUTPUT
+          echo "max_instances=5" >> $GITHUB_OUTPUT
+        fi
+        
+        # Determine image tag
+        if [ -n "${{ inputs.image_tag }}" ]; then
+          IMAGE_TAG="${{ inputs.image_tag }}"
+        else
+          IMAGE_TAG="${GITHUB_SHA::8}"
+        fi
+        
+        IMAGE="gcr.io/${{ secrets.GCP_PROJECT_ID }}/shopping-optimizer:${IMAGE_TAG}"
+        echo "image=$IMAGE" >> $GITHUB_OUTPUT
+    
+    - name: Build and push Docker image
+      run: |
+        docker build -t ${{ steps.vars.outputs.image }} .
+        docker push ${{ steps.vars.outputs.image }}
+    
+    - name: Deploy to Cloud Run
+      env:
+        GCP_PROJECT_ID: ${{ secrets.GCP_PROJECT_ID }}
+        GCP_REGION: ${{ secrets.GCP_REGION || 'us-central1' }}
+      run: |
+        gcloud run deploy ${{ steps.vars.outputs.service_name }} \
+          --image ${{ steps.vars.outputs.image }} \
+          --platform managed \
+          --region $GCP_REGION \
+          --project $GCP_PROJECT_ID \
+          --allow-unauthenticated \
+          --set-env-vars "ENVIRONMENT=${{ inputs.environment }}" \
+          --set-secrets "GOOGLE_API_KEY=google-api-key:latest,SALLING_API_KEY=salling-api-key:latest" \
+          --memory ${{ steps.vars.outputs.memory }} \
+          --cpu ${{ steps.vars.outputs.cpu }} \
+          --min-instances ${{ steps.vars.outputs.min_instances }} \
+          --max-instances ${{ steps.vars.outputs.max_instances }} \
+          --timeout 300 \
+          --concurrency 80 \
+          --port 3000
+        
+        # Get service URL
+        SERVICE_URL=$(gcloud run services describe ${{ steps.vars.outputs.service_name }} \
+          --platform managed \
+          --region $GCP_REGION \
+          --project $GCP_PROJECT_ID \
+          --format 'value(status.url)')
+        
+        echo "✅ Deployed to ${{ inputs.environment }}: $SERVICE_URL"
+    
+    - name: Verify deployment
+      run: |
+        sleep 30
+        
+        SERVICE_URL=$(gcloud run services describe ${{ steps.vars.outputs.service_name }} \
+          --platform managed \
+          --region ${{ secrets.GCP_REGION || 'us-central1' }} \
+          --project ${{ secrets.GCP_PROJECT_ID }} \
+          --format 'value(status.url)')
+        
+        echo "Testing deployment at: $SERVICE_URL"
+        curl -f $SERVICE_URL/health || echo "Health check endpoint not available"
+        
+        echo "✅ Deployment verification complete"

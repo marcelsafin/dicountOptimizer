@@ -268,7 +268,7 @@ Transform the Shopping Optimizer into an enterprise-grade, type-safe system usin
   - Fix any CORS or API compatibility issues
   - _Requirements: 7.1, 10.3_
 
-- [ ] 27. Create CI/CD pipeline
+- [x] 27. Create CI/CD pipeline
   - Create .github/workflows/ci.yml
   - Add workflow for running mypy type checking
   - Add workflow for running pytest with coverage

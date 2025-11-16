@@ -1,0 +1,63 @@
+name: Cleanup Old Images
+
+on:
+  schedule:
+    # Run weekly on Sunday at 2 AM UTC
+    - cron: '0 2 * * 0'
+  workflow_dispatch:  # Allow manual triggering
+
+jobs:
+  cleanup-ghcr:
+    name: Cleanup GitHub Container Registry
+    runs-on: ubuntu-latest
+    permissions:
+      packages: write
+    
+    steps:
+    - name: Delete old container images
+      uses: snok/container-retention-policy@v2
+      with:
+        image-names: shopping-optimizer
+        cut-off: 30 days ago UTC
+        keep-at-least: 5
+        account-type: org
+        token: ${{ secrets.GITHUB_TOKEN }}
+
+  cleanup-gcr:
+    name: Cleanup Google Container Registry
+    runs-on: ubuntu-latest
+    
+    steps:
+    - name: Authenticate to Google Cloud
+      uses: google-github-actions/auth@v2
+      with:
+        credentials_json: ${{ secrets.GCP_SA_KEY }}
+    
+    - name: Set up Cloud SDK
+      uses: google-github-actions/setup-gcloud@v2
+    
+    - name: List and delete old images
+      env:
+        GCP_PROJECT_ID: ${{ secrets.GCP_PROJECT_ID }}
+        IMAGE_NAME: shopping-optimizer
+      run: |
+        # Get all image tags older than 30 days
+        CUTOFF_DATE=$(date -d '30 days ago' +%s)
+        
+        # List all tags
+        gcloud container images list-tags \
+          gcr.io/${GCP_PROJECT_ID}/${IMAGE_NAME} \
+          --format='get(digest,timestamp.datetime)' \
+          --filter="NOT tags:latest AND NOT tags:production" \
+          | while read -r digest timestamp; do
+            IMAGE_DATE=$(date -d "$timestamp" +%s)
+            
+            if [ $IMAGE_DATE -lt $CUTOFF_DATE ]; then
+              echo "Deleting old image: $digest (from $timestamp)"
+              gcloud container images delete \
+                "gcr.io/${GCP_PROJECT_ID}/${IMAGE_NAME}@${digest}" \
+                --quiet
+            fi
+          done
+        
+        echo "✅ Cleanup complete"
