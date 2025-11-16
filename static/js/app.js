@@ -111,8 +111,10 @@ document.addEventListener('DOMContentLoaded', function() {
             return false;
         }
 
-        // Meal plan is now optional - AI will suggest if empty
-        // No validation needed for meal plan
+        if (!mealPlan) {
+            showError('Please enter at least one meal');
+            return false;
+        }
 
         if (costValue === 0 && timeValue === 0 && qualityValue === 0) {
             showError('Please set at least one optimization preference above 0');
@@ -193,15 +195,33 @@ document.addEventListener('DOMContentLoaded', function() {
 
             const result = await response.json();
 
-            if (result.success) {
+            if (response.ok && result.success) {
                 displayResults(result);
             } else {
                 hideLoading();
-                showError(result.error || 'Optimization failed. Please try again.');
+                
+                // Show specific error message based on error type
+                let errorMessage = result.error || 'Optimization failed. Please try again.';
+                
+                if (result.error_type === 'validation') {
+                    errorMessage = `Input validation error: ${result.error}`;
+                } else if (result.error_type === 'optimization') {
+                    errorMessage = `Optimization error: ${result.error}`;
+                } else if (result.error_type === 'server') {
+                    errorMessage = `Server error: ${result.error}`;
+                }
+                
+                // Add correlation ID for debugging if available
+                if (result.correlation_id) {
+                    console.error('Error correlation ID:', result.correlation_id);
+                    errorMessage += ` (ID: ${result.correlation_id.substring(0, 8)})`;
+                }
+                
+                showError(errorMessage);
             }
         } catch (error) {
             hideLoading();
-            showError('Failed to connect to the server. Please try again.');
+            showError('Failed to connect to the server. Please check your internet connection and try again.');
             console.error('Optimization error:', error);
         }
     }
@@ -212,39 +232,37 @@ document.addEventListener('DOMContentLoaded', function() {
     function displayResults(result) {
         hideLoading();
         
-        // Parse the recommendation text to extract structured data
+        // Extract recommendation data from new Pydantic model structure
         const recommendation = result.recommendation;
         
         // Display map with stores
-        if (result.stores && result.stores.length > 0 && result.user_location) {
-            displayStoreMap(result.stores, result.user_location);
-            displayStoreList(result.stores);
+        if (recommendation.stores && recommendation.stores.length > 0 && result.user_location) {
+            displayStoreMap(recommendation.stores, result.user_location);
+            displayStoreList(recommendation.stores);
         }
         
-        // Populate shopping list with formatted recommendation
+        // Populate shopping list with purchases
         const shoppingList = document.getElementById('shopping-list');
-        shoppingList.innerHTML = formatRecommendationHTML(recommendation);
+        shoppingList.innerHTML = formatPurchasesHTML(recommendation.purchases, recommendation.stores);
 
         // Populate savings
-        const totalSavings = result.total_savings || 0;
-        const timeSavings = result.time_savings || 0;
+        const totalSavings = recommendation.total_savings || 0;
+        const timeSavings = recommendation.time_savings || 0;
         
-        document.getElementById('monetary-savings').textContent = `${totalSavings.toFixed(2)} kr`;
-        document.getElementById('time-savings').textContent = `${timeSavings.toFixed(2)} hours`;
+        document.getElementById('monetary-savings').textContent = `${parseFloat(totalSavings).toFixed(2)} kr`;
+        document.getElementById('time-savings').textContent = `${parseFloat(timeSavings).toFixed(1)} minutes`;
 
-        // Extract and populate tips from recommendation
-        const tips = extractTips(recommendation);
+        // Populate tips from recommendation
         const tipsList = document.getElementById('tips-list');
-        if (tips.length > 0) {
-            tipsList.innerHTML = tips.map(tip => `<li>${escapeHtml(tip)}</li>`).join('');
+        if (recommendation.tips && recommendation.tips.length > 0) {
+            tipsList.innerHTML = recommendation.tips.map(tip => `<li>${escapeHtml(tip)}</li>`).join('');
         } else {
             tipsList.innerHTML = '<li>No specific tips available for this shopping plan.</li>';
         }
 
-        // Extract and populate motivation message
-        const motivation = extractMotivation(recommendation);
+        // Populate motivation message
         const motivationMessage = document.getElementById('motivation-message');
-        motivationMessage.textContent = motivation || 'Happy shopping! Your optimized plan is ready.';
+        motivationMessage.textContent = recommendation.motivation_message || 'Happy shopping! Your optimized plan is ready.';
 
         // Show results section
         resultsSection.style.display = 'block';
@@ -254,113 +272,80 @@ document.addEventListener('DOMContentLoaded', function() {
     }
 
     /**
-     * Format recommendation text as HTML
+     * Format purchases as HTML grouped by store and day
      */
-    function formatRecommendationHTML(recommendation) {
-        if (!recommendation) {
-            return '<p>No recommendations available.</p>';
+    function formatPurchasesHTML(purchases, stores) {
+        if (!purchases || purchases.length === 0) {
+            return '<p>No purchases recommended. Try adjusting your preferences or location.</p>';
         }
 
-        // Split by lines and format
-        const lines = recommendation.split('\n');
+        // Group purchases by store
+        const purchasesByStore = {};
+        purchases.forEach(purchase => {
+            if (!purchasesByStore[purchase.store_name]) {
+                purchasesByStore[purchase.store_name] = [];
+            }
+            purchasesByStore[purchase.store_name].push(purchase);
+        });
+
         let html = '';
-        let inList = false;
-
-        for (let line of lines) {
-            line = line.trim();
-            if (!line) continue;
-
-            // Check if it's a store/day header (contains emoji or all caps)
-            if (line.match(/^[🏪📅🛒]/) || line.match(/^[A-ZÆØÅ\s]+:/) || line.includes('**')) {
-                if (inList) {
-                    html += '</ul>';
-                    inList = false;
-                }
-                // Remove markdown bold markers
-                line = line.replace(/\*\*/g, '');
-                html += `<h4 style="margin-top: 15px; margin-bottom: 8px; color: #667eea; font-size: 1.1rem;">${escapeHtml(line)}</h4>`;
-            } else if (line.match(/^[-•*]\s/) || line.match(/^\d+\.\s/)) {
-                // It's a list item
-                if (!inList) {
-                    html += '<ul style="list-style: none; padding-left: 0;">';
-                    inList = true;
-                }
-                // Remove list markers
-                line = line.replace(/^[-•*]\s/, '').replace(/^\d+\.\s/, '');
-                html += `<li style="padding: 8px 0; padding-left: 20px; position: relative;">
-                    <span style="position: absolute; left: 0; color: #667eea;">→</span>
-                    ${escapeHtml(line)}
-                </li>`;
-            } else if (!line.includes('Tips:') && !line.includes('Motivation:')) {
-                // Regular paragraph (skip tips and motivation sections as they're shown separately)
-                if (inList) {
-                    html += '</ul>';
-                    inList = false;
-                }
-                html += `<p style="margin: 8px 0;">${escapeHtml(line)}</p>`;
+        
+        // Display purchases grouped by store
+        Object.entries(purchasesByStore).forEach(([storeName, storePurchases], storeIndex) => {
+            // Find store details
+            const storeInfo = stores.find(s => s.name === storeName);
+            const storeNumber = storeIndex + 1;
+            
+            html += `<div class="store-section" style="margin-bottom: 25px; padding: 15px; background: #f8f9fa; border-radius: 8px; border-left: 4px solid #667eea;">`;
+            html += `<h4 style="margin: 0 0 12px 0; color: #667eea; display: flex; align-items: center; gap: 8px;">`;
+            html += `<span style="background: #667eea; color: white; width: 24px; height: 24px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 12px; font-weight: bold;">${storeNumber}</span>`;
+            html += `${escapeHtml(storeName)}`;
+            if (storeInfo && storeInfo.distance_km) {
+                html += ` <span style="font-size: 0.85rem; color: #666; font-weight: normal;">(${storeInfo.distance_km.toFixed(1)} km)</span>`;
             }
-        }
-
-        if (inList) {
+            html += `</h4>`;
+            
+            html += '<ul style="list-style: none; padding-left: 0; margin: 0;">';
+            
+            storePurchases.forEach(purchase => {
+                const savings = parseFloat(purchase.savings);
+                const price = parseFloat(purchase.price);
+                const savingsPercent = savings > 0 && price > 0 ? ((savings / (price + savings)) * 100).toFixed(0) : 0;
+                
+                html += `<li style="padding: 10px 0; border-bottom: 1px solid #e0e0e0; display: flex; justify-content: space-between; align-items: start;">`;
+                html += `<div style="flex: 1;">`;
+                html += `<div style="font-weight: 500; color: #333;">${escapeHtml(purchase.product_name)}</div>`;
+                html += `<div style="font-size: 0.85rem; color: #666; margin-top: 4px;">`;
+                html += `For: ${escapeHtml(purchase.meal_association)} • `;
+                html += `Buy on: ${formatDate(purchase.purchase_day)}`;
+                html += `</div>`;
+                html += `</div>`;
+                html += `<div style="text-align: right; margin-left: 15px;">`;
+                html += `<div style="font-weight: 600; color: #667eea;">${price.toFixed(2)} kr</div>`;
+                if (savings > 0) {
+                    html += `<div style="font-size: 0.85rem; color: #10b981;">Save ${savings.toFixed(2)} kr (${savingsPercent}%)</div>`;
+                }
+                html += `</div>`;
+                html += `</li>`;
+            });
+            
             html += '</ul>';
-        }
+            html += '</div>';
+        });
 
-        return html || '<p>No shopping list available.</p>';
+        return html;
     }
-
+    
     /**
-     * Extract tips from recommendation text
+     * Format date for display
      */
-    function extractTips(recommendation) {
-        const tips = [];
-        const lines = recommendation.split('\n');
-        let inTipsSection = false;
-
-        for (let line of lines) {
-            line = line.trim();
-            
-            if (line.includes('Tips:') || line.includes('💡')) {
-                inTipsSection = true;
-                continue;
-            }
-            
-            if (inTipsSection) {
-                if (line.includes('Motivation:') || line.includes('🎉')) {
-                    break;
-                }
-                if (line.match(/^[-•*]\s/) || line.match(/^\d+\.\s/)) {
-                    const tip = line.replace(/^[-•*]\s/, '').replace(/^\d+\.\s/, '').trim();
-                    if (tip) tips.push(tip);
-                }
-            }
-        }
-
-        return tips;
+    function formatDate(dateString) {
+        const date = new Date(dateString);
+        const options = { weekday: 'short', month: 'short', day: 'numeric' };
+        return date.toLocaleDateString('en-US', options);
     }
 
-    /**
-     * Extract motivation message from recommendation text
-     */
-    function extractMotivation(recommendation) {
-        const lines = recommendation.split('\n');
-        let inMotivationSection = false;
-        let motivation = '';
 
-        for (let line of lines) {
-            line = line.trim();
-            
-            if (line.includes('Motivation:') || line.includes('🎉')) {
-                inMotivationSection = true;
-                continue;
-            }
-            
-            if (inMotivationSection && line) {
-                motivation += line + ' ';
-            }
-        }
-
-        return motivation.trim();
-    }
 
     /**
      * Escape HTML to prevent XSS
@@ -395,10 +380,13 @@ document.addEventListener('DOMContentLoaded', function() {
         errorText.textContent = message;
         errorMessage.style.display = 'block';
         
-        // Auto-hide after 5 seconds
+        // Scroll to error message
+        errorMessage.scrollIntoView({ behavior: 'smooth', block: 'center' });
+        
+        // Auto-hide after 8 seconds (longer for users to read)
         setTimeout(() => {
             hideError();
-        }, 5000);
+        }, 8000);
     }
 
     /**
@@ -419,6 +407,12 @@ document.addEventListener('DOMContentLoaded', function() {
         // Clear existing map if any
         if (storeMapInstance) {
             storeMapInstance.remove();
+        }
+        
+        // Validate user location
+        if (!userLocation || !userLocation.latitude || !userLocation.longitude) {
+            console.warn('Invalid user location for map display');
+            return;
         }
         
         // Create map centered on user location
@@ -445,8 +439,10 @@ document.addEventListener('DOMContentLoaded', function() {
             .addTo(storeMapInstance)
             .bindPopup('<strong>Your Location</strong>');
         
-        // Add store markers
-        stores.forEach((store, index) => {
+        // Add store markers (if stores have location data)
+        const storesWithLocation = stores.filter(s => s.latitude && s.longitude);
+        
+        storesWithLocation.forEach((store, index) => {
             const storeIcon = L.divIcon({
                 className: 'store-marker',
                 html: `<div style="background: #ff6b6b; width: 30px; height: 30px; border-radius: 50%; border: 3px solid white; box-shadow: 0 2px 8px rgba(0,0,0,0.3); display: flex; align-items: center; justify-content: center; color: white; font-weight: bold; font-size: 14px;">${index + 1}</div>`,
@@ -454,27 +450,26 @@ document.addEventListener('DOMContentLoaded', function() {
                 iconAnchor: [15, 15]
             });
             
-            const productList = store.products
-                .map(p => `${p.name} (${p.discount_percent}% off)`)
-                .join('<br>');
+            const itemsText = store.items === 1 ? '1 item' : `${store.items} items`;
             
             L.marker([store.latitude, store.longitude], { icon: storeIcon })
                 .addTo(storeMapInstance)
                 .bindPopup(`
                     <strong>${escapeHtml(store.name)}</strong><br>
-                    <small>${escapeHtml(store.address)}</small><br>
-                    <small style="color: #667eea; font-weight: 600;">${store.distance_km.toFixed(1)} km away</small><br>
-                    <hr style="margin: 5px 0;">
-                    <small>${productList}</small>
+                    <small>${escapeHtml(store.address || 'Address not available')}</small><br>
+                    <small style="color: #667eea; font-weight: 600;">${(store.distance_km || 0).toFixed(1)} km away</small><br>
+                    <small>${itemsText} to purchase</small>
                 `);
         });
         
         // Fit map to show all markers
-        const bounds = L.latLngBounds([
-            [userLocation.latitude, userLocation.longitude],
-            ...stores.map(s => [s.latitude, s.longitude])
-        ]);
-        storeMapInstance.fitBounds(bounds, { padding: [50, 50] });
+        if (storesWithLocation.length > 0) {
+            const bounds = L.latLngBounds([
+                [userLocation.latitude, userLocation.longitude],
+                ...storesWithLocation.map(s => [s.latitude, s.longitude])
+            ]);
+            storeMapInstance.fitBounds(bounds, { padding: [50, 50] });
+        }
     }
 
     /**
@@ -483,9 +478,16 @@ document.addEventListener('DOMContentLoaded', function() {
     function displayStoreList(stores) {
         const storeList = document.getElementById('store-list');
         
+        if (!stores || stores.length === 0) {
+            storeList.innerHTML = '<p style="text-align: center; color: #666;">No stores found.</p>';
+            return;
+        }
+        
         const storeCards = stores.map((store, index) => {
-            const productCount = store.products.length;
-            const productText = productCount === 1 ? '1 product' : `${productCount} products`;
+            const itemCount = store.items || 0;
+            const itemText = itemCount === 1 ? '1 item' : `${itemCount} items`;
+            const distanceKm = store.distance_km || 0;
+            const address = store.address || 'Address not available';
             
             return `
                 <div class="store-card">
@@ -493,10 +495,10 @@ document.addEventListener('DOMContentLoaded', function() {
                         <span style="background: #ff6b6b; color: white; width: 24px; height: 24px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-weight: bold; font-size: 12px;">${index + 1}</span>
                         <h4>${escapeHtml(store.name)}</h4>
                     </div>
-                    <div class="store-card-address">${escapeHtml(store.address)}</div>
-                    <div class="store-card-distance">📍 ${store.distance_km.toFixed(1)} km away</div>
+                    <div class="store-card-address">${escapeHtml(address)}</div>
+                    <div class="store-card-distance">📍 ${distanceKm.toFixed(1)} km away</div>
                     <div class="store-card-products">
-                        <strong>${productText}</strong> with discounts
+                        <strong>${itemText}</strong> to purchase
                     </div>
                 </div>
             `;
