@@ -1,0 +1,144 @@
+# GitHub Actions workflow for deploying to Google Cloud Run (Production)
+# This workflow is triggered on push to the main branch
+#
+# Prerequisites:
+#   - GCP project with Cloud Run, Cloud Build, and Secret Manager enabled
+#   - Service account with necessary permissions
+#   - GitHub secrets configured (see below)
+#
+# Required GitHub Secrets:
+#   - GCP_PROJECT_ID: Your Google Cloud project ID
+#   - GCP_SA_KEY: Service account key JSON (base64 encoded)
+#
+# Requirements: 9.5
+
+name: Deploy to Production
+
+on:
+  push:
+    branches:
+      - main
+  workflow_dispatch:  # Allow manual trigger
+
+env:
+  PROJECT_ID: ${{ secrets.GCP_PROJECT_ID }}
+  REGION: us-central1
+  SERVICE_NAME: shopping-optimizer
+
+jobs:
+  deploy:
+    name: Deploy to Cloud Run
+    runs-on: ubuntu-latest
+    
+    permissions:
+      contents: read
+      id-token: write
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+      
+      - name: Set up Cloud SDK
+        uses: google-github-actions/setup-gcloud@v2
+        with:
+          project_id: ${{ secrets.GCP_PROJECT_ID }}
+      
+      - name: Authenticate to Google Cloud
+        uses: google-github-actions/auth@v2
+        with:
+          credentials_json: ${{ secrets.GCP_SA_KEY }}
+      
+      - name: Configure Docker for GCR
+        run: |
+          gcloud auth configure-docker
+      
+      - name: Build and deploy with Cloud Build
+        run: |
+          gcloud builds submit \
+            --config cloudbuild.yaml \
+            --substitutions="\
+          _ENVIRONMENT=production,\
+          _REGION=${{ env.REGION }},\
+          _MEMORY=2Gi,\
+          _CPU=2,\
+          _TIMEOUT=300s,\
+          _MAX_INSTANCES=10,\
+          _MIN_INSTANCES=1,\
+          _CONCURRENCY=80,\
+          _LOG_LEVEL=INFO,\
+          _AGENT_MODEL=gemini-2.0-flash-exp,\
+          _AGENT_TEMPERATURE=0.7,\
+          _CACHE_TTL_SECONDS=3600"
+      
+      - name: Get service URL
+        id: get-url
+        run: |
+          SERVICE_URL=$(gcloud run services describe ${{ env.SERVICE_NAME }} \
+            --region=${{ env.REGION }} \
+            --format="value(status.url)")
+          echo "SERVICE_URL=$SERVICE_URL" >> $GITHUB_OUTPUT
+          echo "Service URL: $SERVICE_URL"
+      
+      - name: Test deployment
+        run: |
+          SERVICE_URL="${{ steps.get-url.outputs.SERVICE_URL }}"
+          
+          # Test health endpoint
+          echo "Testing health endpoint..."
+          HTTP_STATUS=$(curl -s -o /dev/null -w "%{http_code}" "$SERVICE_URL/health")
+          
+          if [ "$HTTP_STATUS" = "200" ]; then
+            echo "✓ Health check passed"
+          else
+            echo "✗ Health check failed (HTTP $HTTP_STATUS)"
+            exit 1
+          fi
+          
+          # Test detailed health endpoint
+          echo "Testing detailed health endpoint..."
+          HTTP_STATUS=$(curl -s -o /dev/null -w "%{http_code}" "$SERVICE_URL/health/detailed")
+          
+          if [ "$HTTP_STATUS" = "200" ]; then
+            echo "✓ Detailed health check passed"
+          else
+            echo "✗ Detailed health check failed (HTTP $HTTP_STATUS)"
+            exit 1
+          fi
+          
+          echo "Deployment successful!"
+      
+      - name: Create deployment summary
+        run: |
+          SERVICE_URL="${{ steps.get-url.outputs.SERVICE_URL }}"
+          
+          echo "## Deployment Summary" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "✅ Successfully deployed to production" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "**Service URL:** $SERVICE_URL" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "**Configuration:**" >> $GITHUB_STEP_SUMMARY
+          echo "- Environment: production" >> $GITHUB_STEP_SUMMARY
+          echo "- Region: ${{ env.REGION }}" >> $GITHUB_STEP_SUMMARY
+          echo "- Memory: 2Gi" >> $GITHUB_STEP_SUMMARY
+          echo "- CPU: 2" >> $GITHUB_STEP_SUMMARY
+          echo "- Min instances: 1" >> $GITHUB_STEP_SUMMARY
+          echo "- Max instances: 10" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "**Next Steps:**" >> $GITHUB_STEP_SUMMARY
+          echo "1. Test the API: \`curl $SERVICE_URL/health/detailed\`" >> $GITHUB_STEP_SUMMARY
+          echo "2. View logs: \`gcloud logging tail \"resource.type=cloud_run_revision\"\`" >> $GITHUB_STEP_SUMMARY
+          echo "3. View metrics: \`curl $SERVICE_URL/metrics/summary\`" >> $GITHUB_STEP_SUMMARY
+      
+      - name: Notify on failure
+        if: failure()
+        run: |
+          echo "## Deployment Failed" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "❌ Deployment to production failed" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "**Troubleshooting:**" >> $GITHUB_STEP_SUMMARY
+          echo "1. Check Cloud Build logs in GCP Console" >> $GITHUB_STEP_SUMMARY
+          echo "2. Verify all secrets are configured" >> $GITHUB_STEP_SUMMARY
+          echo "3. Check service account permissions" >> $GITHUB_STEP_SUMMARY
+          echo "4. Review Cloud Run service logs" >> $GITHUB_STEP_SUMMARY

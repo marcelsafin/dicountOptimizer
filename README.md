@@ -789,6 +789,123 @@ if settings.is_production():
     print("Running in production mode")
 ```
 
+## Deployment
+
+### Google Cloud Run Deployment
+
+The Shopping Optimizer can be deployed to Google Cloud Run for production use with auto-scaling, high availability, and managed infrastructure.
+
+#### Quick Deployment (3 Steps)
+
+```bash
+# 1. Set up GCP infrastructure (VPC, Redis, secrets)
+export PROJECT_ID="your-project-id"
+./scripts/setup-gcp-infrastructure.sh
+
+# 2. Deploy to staging (optional)
+./scripts/deploy-staging.sh
+
+# 3. Deploy to production
+./scripts/deploy-production.sh
+```
+
+#### What Gets Deployed
+
+- **Cloud Run Service**: Auto-scaling container service
+- **Redis (Memorystore)**: Distributed cache for multi-instance support
+- **VPC Connector**: Secure connection to Redis
+- **Secret Manager**: Secure storage for API keys
+- **Load Balancer**: Automatic HTTPS and SSL certificates
+
+#### Features
+
+- ✅ Auto-scaling (0-10 instances based on traffic)
+- ✅ High availability with Redis HA
+- ✅ Automatic HTTPS and SSL certificates
+- ✅ Health checks and monitoring
+- ✅ Structured logging to Cloud Logging
+- ✅ Metrics and observability
+- ✅ CI/CD with Cloud Build
+- ✅ Custom domain support
+
+#### Cost Estimate
+
+**Production (24/7)**:
+- Cloud Run: ~$50-150/month
+- Redis (Standard HA): ~$150/month
+- VPC Connector: ~$10/month
+- **Total: ~$210-310/month**
+
+**Staging (scale to zero)**:
+- Cloud Run: ~$10-30/month
+- Redis (Basic): ~$50/month
+- VPC Connector: ~$10/month
+- **Total: ~$70-90/month**
+
+#### Documentation
+
+- **[Quick Start Guide](DEPLOYMENT_QUICK_START.md)**: Get deployed in 15 minutes
+- **[Complete Deployment Guide](docs/CLOUD_RUN_DEPLOYMENT.md)**: Comprehensive documentation with troubleshooting
+- **[Cloud Build Configuration](cloudbuild.yaml)**: CI/CD pipeline configuration
+
+#### Deployment Scripts
+
+- `scripts/setup-gcp-infrastructure.sh`: Set up all GCP resources
+- `scripts/deploy-production.sh`: Deploy to production
+- `scripts/deploy-staging.sh`: Deploy to staging
+- `scripts/test-deployment.sh`: End-to-end deployment testing
+
+#### Manual Deployment
+
+```bash
+# Build and deploy with Cloud Build
+gcloud builds submit --config cloudbuild.yaml
+
+# Or deploy directly
+gcloud run deploy shopping-optimizer \
+  --image=gcr.io/$PROJECT_ID/shopping-optimizer:latest \
+  --region=us-central1 \
+  --platform=managed \
+  --memory=2Gi \
+  --cpu=2 \
+  --max-instances=10
+```
+
+#### Monitoring
+
+After deployment, monitor your service:
+
+```bash
+# Get service URL
+SERVICE_URL=$(gcloud run services describe shopping-optimizer \
+  --region=us-central1 \
+  --format="value(status.url)")
+
+# Test health
+curl $SERVICE_URL/health/detailed
+
+# View metrics
+curl $SERVICE_URL/metrics/summary
+
+# Stream logs
+gcloud logging tail "resource.type=cloud_run_revision"
+```
+
+### Docker Deployment
+
+For local development or self-hosted deployment:
+
+```bash
+# Using Docker Compose (recommended)
+docker-compose up -d
+
+# Or build and run manually
+docker build -t shopping-optimizer .
+docker run -p 3000:3000 --env-file .env shopping-optimizer
+```
+
+See [Docker Deployment Guide](docs/DOCKER_DEPLOYMENT.md) for details.
+
 ## Contributing
 
 This project uses the ADK (Agent Development Kit) framework for agent orchestration. See `.kiro/specs/google-adk-modernization/` for detailed requirements, design, and implementation documentation.

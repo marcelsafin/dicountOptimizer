@@ -1,0 +1,201 @@
+# GitHub Actions workflow for deploying to Google Cloud Run (Staging)
+# This workflow is triggered on push to the staging branch
+#
+# Prerequisites:
+#   - GCP project with Cloud Run, Cloud Build, and Secret Manager enabled
+#   - Service account with necessary permissions
+#   - GitHub secrets configured (see below)
+#
+# Required GitHub Secrets:
+#   - GCP_PROJECT_ID: Your Google Cloud project ID
+#   - GCP_SA_KEY: Service account key JSON (base64 encoded)
+#
+# Requirements: 9.5
+
+name: Deploy to Staging
+
+on:
+  push:
+    branches:
+      - staging
+  pull_request:
+    branches:
+      - main
+  workflow_dispatch:  # Allow manual trigger
+
+env:
+  PROJECT_ID: ${{ secrets.GCP_PROJECT_ID }}
+  REGION: us-central1
+  SERVICE_NAME: shopping-optimizer-staging
+
+jobs:
+  deploy:
+    name: Deploy to Cloud Run (Staging)
+    runs-on: ubuntu-latest
+    
+    permissions:
+      contents: read
+      id-token: write
+      pull-requests: write  # For PR comments
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+      
+      - name: Set up Cloud SDK
+        uses: google-github-actions/setup-gcloud@v2
+        with:
+          project_id: ${{ secrets.GCP_PROJECT_ID }}
+      
+      - name: Authenticate to Google Cloud
+        uses: google-github-actions/auth@v2
+        with:
+          credentials_json: ${{ secrets.GCP_SA_KEY }}
+      
+      - name: Configure Docker for GCR
+        run: |
+          gcloud auth configure-docker
+      
+      - name: Build and deploy with Cloud Build
+        run: |
+          gcloud builds submit \
+            --config cloudbuild.yaml \
+            --substitutions="\
+          _ENVIRONMENT=staging,\
+          _REGION=${{ env.REGION }},\
+          _MEMORY=1Gi,\
+          _CPU=1,\
+          _TIMEOUT=300s,\
+          _MAX_INSTANCES=3,\
+          _MIN_INSTANCES=0,\
+          _CONCURRENCY=80,\
+          _LOG_LEVEL=DEBUG,\
+          _AGENT_MODEL=gemini-2.0-flash-exp,\
+          _AGENT_TEMPERATURE=0.7,\
+          _CACHE_TTL_SECONDS=1800"
+      
+      - name: Get service URL
+        id: get-url
+        run: |
+          SERVICE_URL=$(gcloud run services describe ${{ env.SERVICE_NAME }} \
+            --region=${{ env.REGION }} \
+            --format="value(status.url)" 2>/dev/null || echo "")
+          
+          if [ -z "$SERVICE_URL" ]; then
+            echo "Error: Could not get service URL"
+            exit 1
+          fi
+          
+          echo "SERVICE_URL=$SERVICE_URL" >> $GITHUB_OUTPUT
+          echo "Service URL: $SERVICE_URL"
+      
+      - name: Test deployment
+        run: |
+          SERVICE_URL="${{ steps.get-url.outputs.SERVICE_URL }}"
+          
+          # Wait for service to be ready
+          echo "Waiting for service to be ready..."
+          sleep 10
+          
+          # Test health endpoint
+          echo "Testing health endpoint..."
+          HTTP_STATUS=$(curl -s -o /dev/null -w "%{http_code}" "$SERVICE_URL/health")
+          
+          if [ "$HTTP_STATUS" = "200" ]; then
+            echo "✓ Health check passed"
+          else
+            echo "✗ Health check failed (HTTP $HTTP_STATUS)"
+            exit 1
+          fi
+          
+          # Test detailed health endpoint
+          echo "Testing detailed health endpoint..."
+          HTTP_STATUS=$(curl -s -o /dev/null -w "%{http_code}" "$SERVICE_URL/health/detailed")
+          
+          if [ "$HTTP_STATUS" = "200" ]; then
+            echo "✓ Detailed health check passed"
+          else
+            echo "✗ Detailed health check failed (HTTP $HTTP_STATUS)"
+            exit 1
+          fi
+          
+          echo "Deployment successful!"
+      
+      - name: Comment on PR
+        if: github.event_name == 'pull_request'
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const serviceUrl = '${{ steps.get-url.outputs.SERVICE_URL }}';
+            
+            const comment = `## 🚀 Staging Deployment Successful
+            
+            Your changes have been deployed to staging!
+            
+            **Service URL:** ${serviceUrl}
+            
+            **Test the deployment:**
+            \`\`\`bash
+            # Health check
+            curl ${serviceUrl}/health
+            
+            # Detailed health check
+            curl ${serviceUrl}/health/detailed
+            
+            # Metrics
+            curl ${serviceUrl}/metrics/summary
+            \`\`\`
+            
+            **Configuration:**
+            - Environment: staging
+            - Region: ${{ env.REGION }}
+            - Memory: 1Gi
+            - CPU: 1
+            - Min instances: 0 (scale to zero)
+            - Max instances: 3
+            - Log level: DEBUG
+            `;
+            
+            github.rest.issues.createComment({
+              issue_number: context.issue.number,
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              body: comment
+            });
+      
+      - name: Create deployment summary
+        run: |
+          SERVICE_URL="${{ steps.get-url.outputs.SERVICE_URL }}"
+          
+          echo "## Deployment Summary" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "✅ Successfully deployed to staging" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "**Service URL:** $SERVICE_URL" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "**Configuration:**" >> $GITHUB_STEP_SUMMARY
+          echo "- Environment: staging" >> $GITHUB_STEP_SUMMARY
+          echo "- Region: ${{ env.REGION }}" >> $GITHUB_STEP_SUMMARY
+          echo "- Memory: 1Gi" >> $GITHUB_STEP_SUMMARY
+          echo "- CPU: 1" >> $GITHUB_STEP_SUMMARY
+          echo "- Min instances: 0 (scale to zero)" >> $GITHUB_STEP_SUMMARY
+          echo "- Max instances: 3" >> $GITHUB_STEP_SUMMARY
+          echo "- Log level: DEBUG" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "**Next Steps:**" >> $GITHUB_STEP_SUMMARY
+          echo "1. Test the API: \`curl $SERVICE_URL/health/detailed\`" >> $GITHUB_STEP_SUMMARY
+          echo "2. View logs: \`gcloud logging tail \"resource.type=cloud_run_revision AND resource.labels.service_name=${{ env.SERVICE_NAME }}\"\`" >> $GITHUB_STEP_SUMMARY
+          echo "3. View metrics: \`curl $SERVICE_URL/metrics/summary\`" >> $GITHUB_STEP_SUMMARY
+      
+      - name: Notify on failure
+        if: failure()
+        run: |
+          echo "## Deployment Failed" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "❌ Deployment to staging failed" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "**Troubleshooting:**" >> $GITHUB_STEP_SUMMARY
+          echo "1. Check Cloud Build logs in GCP Console" >> $GITHUB_STEP_SUMMARY
+          echo "2. Verify all secrets are configured" >> $GITHUB_STEP_SUMMARY
+          echo "3. Check service account permissions" >> $GITHUB_STEP_SUMMARY
+          echo "4. Review Cloud Run service logs" >> $GITHUB_STEP_SUMMARY

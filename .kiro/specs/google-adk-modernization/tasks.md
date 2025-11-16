@@ -287,7 +287,7 @@ Transform the Shopping Optimizer into an enterprise-grade, type-safe system usin
   - Document Docker deployment process
   - _Requirements: 9.5_
 
-- [ ] 29. Google Cloud Run deployment
+- [x] 29. Google Cloud Run deployment
   - Create cloudbuild.yaml for Cloud Build
   - Configure Cloud Run service with proper resources
   - Set up environment variables and secrets in Cloud Run
