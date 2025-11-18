@@ -564,3 +564,10 @@ def metrics_prometheus() -> tuple[str, int, dict[str, str]]:
 # For production, use:
 #   gunicorn app:app --worker-class uvicorn.workers.UvicornWorker \
 #     --workers 4 --bind 0.0.0.0:$PORT --timeout 120 --graceful-timeout 30
+
+
+# ASGI wrapper for Flask to work with Uvicorn workers
+# This converts Flask's WSGI interface to ASGI
+from asgiref.wsgi import WsgiToAsgi
+
+asgi_app = WsgiToAsgi(app)
