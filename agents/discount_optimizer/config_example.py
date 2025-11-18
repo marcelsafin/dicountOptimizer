@@ -81,8 +81,8 @@ def example_environment_override():
     print(f"Current log level: {settings.log_level}")
     print(f"Current temperature: {settings.agent_temperature}")
 
-    # To reload settings after environment changes:
-    # new_settings = reload_settings()
+    # To reload settings after environment changes, use:
+    # new_settings = reload_settings()  # noqa: ERA001
 
 
 def example_validation():
