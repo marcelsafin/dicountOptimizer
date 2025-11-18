@@ -22,6 +22,7 @@ import pytest
 from agents.discount_optimizer.models import DiscountItem, Location
 from agents.discount_optimizer.salling_api_client import SallingAPIClient
 
+
 pytestmark = pytest.mark.skip(reason="Legacy test - needs update for new architecture")
 
 

@@ -45,11 +45,14 @@ def mock_redis_pool():
 @pytest.fixture
 def redis_cache(mock_redis_client, mock_redis_pool):
     """Create a RedisCacheRepository with mocked Redis client."""
-    with patch(
-        "agents.discount_optimizer.infrastructure.redis_cache_repository.redis.ConnectionPool"
-    ) as mock_pool_class, patch(
-        "agents.discount_optimizer.infrastructure.redis_cache_repository.redis.Redis"
-    ) as mock_redis_class:
+    with (
+        patch(
+            "agents.discount_optimizer.infrastructure.redis_cache_repository.redis.ConnectionPool"
+        ) as mock_pool_class,
+        patch(
+            "agents.discount_optimizer.infrastructure.redis_cache_repository.redis.Redis"
+        ) as mock_redis_class,
+    ):
         mock_pool_class.return_value = mock_redis_pool
         mock_redis_class.return_value = mock_redis_client
 
@@ -300,10 +303,11 @@ class TestCacheFactory:
 
     def test_create_redis_cache(self):
         """Test creating Redis cache."""
-        with patch(
-            "agents.discount_optimizer.infrastructure.redis_cache_repository.redis.ConnectionPool"
-        ), patch(
-            "agents.discount_optimizer.infrastructure.redis_cache_repository.redis.Redis"
+        with (
+            patch(
+                "agents.discount_optimizer.infrastructure.redis_cache_repository.redis.ConnectionPool"
+            ),
+            patch("agents.discount_optimizer.infrastructure.redis_cache_repository.redis.Redis"),
         ):
             cache = create_cache_repository(
                 cache_type="redis",

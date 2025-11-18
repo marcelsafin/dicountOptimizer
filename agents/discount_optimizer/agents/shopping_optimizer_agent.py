@@ -496,7 +496,9 @@ class ShoppingOptimizerAgent:
                 correlation_id=get_correlation_id(),
             )
             # Return empty result as fallback
-            from agents.discount_optimizer.services.discount_matcher_service import DiscountMatchingOutput
+            from agents.discount_optimizer.services.discount_matcher_service import (
+                DiscountMatchingOutput,
+            )
 
             return DiscountMatchingOutput(
                 discounts=[],

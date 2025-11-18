@@ -154,15 +154,15 @@ def demo_optimized_workflow():
             regular_products.append((product_line, days_left, detail["name"]))
 
     print("🚨 URGENT (expires in 1-2 days):")
-    for line, days, name in urgent_products:
+    for line, days, _name in urgent_products:
         print(f"{line} - expires in {days} day(s)")
 
     print("\n⚠️  EXPIRING SOON (3-5 days):")
-    for line, days, name in expiring_soon:
+    for line, days, _name in expiring_soon:
         print(f"{line} - expires in {days} days")
 
     print("\n✓ REGULAR (6+ days):")
-    for line, days, name in regular_products[:5]:  # Show first 5
+    for line, days, _name in regular_products[:5]:  # Show first 5
         print(f"{line} - expires in {days} days")
 
     print()

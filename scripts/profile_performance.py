@@ -123,7 +123,7 @@ async def profile_discount_fetching(discounts: list[DiscountItem]) -> dict[str, 
 
     execution_times = []
 
-    for i in range(5):
+    for _i in range(5):
         start = time.perf_counter()
 
         with profile_operation("fetch_discounts"):
@@ -156,7 +156,7 @@ async def profile_ingredient_mapping(
 
     execution_times = []
 
-    for i in range(5):
+    for _i in range(5):
         start = time.perf_counter()
 
         with profile_operation("ingredient_mapping"):
@@ -188,7 +188,7 @@ async def profile_optimization(discounts: list[DiscountItem]) -> dict[str, Any]:
 
     execution_times = []
 
-    for i in range(5):
+    for _i in range(5):
         start = time.perf_counter()
 
         with profile_operation("optimization"):
@@ -204,7 +204,7 @@ async def profile_optimization(discounts: list[DiscountItem]) -> dict[str, Any]:
 
             # Sort and select top items
             scored.sort(key=lambda x: x[1], reverse=True)
-            optimized = [item[0] for item in scored[:20]]
+            [item[0] for item in scored[:20]]
 
         duration = time.perf_counter() - start
         execution_times.append(duration)
@@ -226,7 +226,7 @@ async def profile_cache_effectiveness(discounts: list[DiscountItem]) -> dict[str
 
     # Measure without cache
     no_cache_times = []
-    for i in range(10):
+    for _i in range(10):
         start = time.perf_counter()
         await asyncio.sleep(0.05)  # Simulate API call
         _ = discounts
@@ -238,7 +238,7 @@ async def profile_cache_effectiveness(discounts: list[DiscountItem]) -> dict[str
     await cache.set("test_discounts", cached_data, ttl_seconds=60)
 
     with_cache_times = []
-    for i in range(10):
+    for _i in range(10):
         start = time.perf_counter()
         result = await cache.get("test_discounts")
         if result:
@@ -313,7 +313,7 @@ async def profile_full_pipeline(discounts: list[DiscountItem], meals: list[str])
         "format": [],
     }
 
-    for i in range(5):
+    for _i in range(5):
         start = time.perf_counter()
 
         with profile_operation("full_pipeline"):

@@ -164,7 +164,7 @@ class TestAgentExecutionProfiling:
             scores.sort(key=lambda x: x[1], reverse=True)
 
             # Select top items
-            optimized = [item[0] for item in scores[:10]]
+            [item[0] for item in scores[:10]]
 
         metric = metrics_collector.timers["optimization"]
         assert metric.count == 1
@@ -207,7 +207,7 @@ class TestAgentExecutionProfiling:
         """Profile multiple executions to get statistical data."""
         execution_times = []
 
-        for i in range(10):
+        for _i in range(10):
             start = time.perf_counter()
             with profile_operation("repeated_execution"):
                 # Simulate work

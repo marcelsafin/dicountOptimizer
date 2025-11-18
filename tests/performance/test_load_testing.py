@@ -222,7 +222,7 @@ class TestAPIRateLimiting:
 
         start = time.perf_counter()
         success = await api_call_with_retries(max_retries=3)
-        duration = time.perf_counter() - start
+        time.perf_counter() - start
 
         assert success
         assert len(attempt_times) == 3
@@ -388,8 +388,7 @@ class TestGracefulDegradation:
             results = await asyncio.gather(*tasks, return_exceptions=True)
 
             # Filter out failures
-            valid_results = [r for r in results if r is not None and isinstance(r, str)]
-            return valid_results
+            return [r for r in results if r is not None and isinstance(r, str)]
 
         results = await fetch_from_multiple_sources()
 

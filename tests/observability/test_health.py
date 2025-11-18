@@ -143,7 +143,7 @@ class TestHealthCheckIntegration:
         # Should handle exception and treat as unhealthy
         try:
             await mock_geocoding_service.health_check()
-            assert False, "Should have raised exception"
+            raise AssertionError("Should have raised exception")
         except Exception as e:
             assert str(e) == "Connection failed"
             # In real implementation, this would be caught and treated as unhealthy
@@ -165,7 +165,7 @@ class TestHealthCheckIntegration:
         # Should timeout and treat as unhealthy
         try:
             await asyncio.wait_for(mock_geocoding_service.health_check(), timeout=0.1)
-            assert False, "Should have timed out"
+            raise AssertionError("Should have timed out")
         except TimeoutError:
             # In real implementation, this would be caught and treated as unhealthy
             pass
@@ -273,18 +273,12 @@ class TestHealthCheckStatusAggregation:
 
         # Some unhealthy -> 200 (degraded)
         unhealthy_count = 1
-        if unhealthy_count == 0 or unhealthy_count < total_count:
-            status_code = 200
-        else:
-            status_code = 503
+        status_code = 200 if unhealthy_count == 0 or unhealthy_count < total_count else 503
         assert status_code == 200
 
         # All unhealthy -> 503
         unhealthy_count = 3
-        if unhealthy_count == 0 or unhealthy_count < total_count:
-            status_code = 200
-        else:
-            status_code = 503
+        status_code = 200 if unhealthy_count == 0 or unhealthy_count < total_count else 503
         assert status_code == 503
 
 
@@ -333,7 +327,7 @@ class TestHealthCheckResponseFormat:
         assert "cache_repository" in deps
 
         # Check each dependency has required fields
-        for dep_name, dep_info in deps.items():
+        for _dep_name, dep_info in deps.items():
             assert "status" in dep_info
             assert "message" in dep_info
             assert dep_info["status"] in ["healthy", "unhealthy"]

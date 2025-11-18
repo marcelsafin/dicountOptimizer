@@ -61,7 +61,7 @@ def initialize_agent_factory() -> AgentFactory:
         logger.info("agent_factory_initialized_successfully")
         return factory
     except ValueError as e:
-        logger.error("agent_factory_initialization_failed", error=str(e))
+        logger.exception("agent_factory_initialization_failed", error=str(e))
         print(f"ERROR: Agent factory initialization failed: {e}", file=sys.stderr)
         print(
             "\nPlease check your .env file and ensure all required configuration is set.",
@@ -70,7 +70,7 @@ def initialize_agent_factory() -> AgentFactory:
         print("Refer to .env.example for the required format.", file=sys.stderr)
         sys.exit(1)
     except Exception as e:
-        logger.error(
+        logger.exception(
             "unexpected_error_during_initialization", error=str(e), error_type=type(e).__name__
         )
         print(f"ERROR: Unexpected error during initialization: {e}", file=sys.stderr)
@@ -154,7 +154,6 @@ async def health_detailed() -> tuple[Response, int] | Response:
         logger.info("detailed_health_check_started", correlation_id=correlation_id)
 
         dependencies: dict[str, dict[str, str]] = {}
-        overall_healthy = True
 
         # Check geocoding service
         try:
@@ -165,7 +164,7 @@ async def health_detailed() -> tuple[Response, int] | Response:
                 "message": "Service is operational" if is_healthy else "Service check failed",
             }
             if not is_healthy:
-                overall_healthy = False
+                pass
         except Exception as e:
             logger.warning(
                 "geocoding_health_check_failed", error=str(e), correlation_id=correlation_id
@@ -174,7 +173,6 @@ async def health_detailed() -> tuple[Response, int] | Response:
                 "status": "unhealthy",
                 "message": f"Health check error: {e!s}",
             }
-            overall_healthy = False
 
         # Check discount repository
         try:
@@ -185,7 +183,7 @@ async def health_detailed() -> tuple[Response, int] | Response:
                 "message": "Service is operational" if is_healthy else "Service check failed",
             }
             if not is_healthy:
-                overall_healthy = False
+                pass
         except Exception as e:
             logger.warning(
                 "discount_repo_health_check_failed", error=str(e), correlation_id=correlation_id
@@ -194,7 +192,6 @@ async def health_detailed() -> tuple[Response, int] | Response:
                 "status": "unhealthy",
                 "message": f"Health check error: {e!s}",
             }
-            overall_healthy = False
 
         # Check cache repository
         try:
@@ -205,14 +202,13 @@ async def health_detailed() -> tuple[Response, int] | Response:
                 "message": "Service is operational" if is_healthy else "Service check failed",
             }
             if not is_healthy:
-                overall_healthy = False
+                pass
         except Exception as e:
             logger.warning("cache_health_check_failed", error=str(e), correlation_id=correlation_id)
             dependencies["cache_repository"] = {
                 "status": "unhealthy",
                 "message": f"Health check error: {e!s}",
             }
-            overall_healthy = False
 
         # Determine overall status
         unhealthy_count = sum(1 for dep in dependencies.values() if dep["status"] == "unhealthy")
@@ -456,7 +452,7 @@ async def optimize() -> tuple[Response, int] | Response:
             ), 400
 
         except ShoppingOptimizerError as e:
-            logger.error("optimization_error", error=str(e), correlation_id=correlation_id)
+            logger.exception("optimization_error", error=str(e), correlation_id=correlation_id)
             return jsonify(
                 {
                     "success": False,
@@ -467,7 +463,7 @@ async def optimize() -> tuple[Response, int] | Response:
             ), 500
 
         except Exception as e:
-            logger.error(
+            logger.exception(
                 "unexpected_error",
                 error=str(e),
                 error_type=type(e).__name__,
@@ -510,7 +506,7 @@ def metrics() -> tuple[Response, int] | Response:
         all_metrics = metrics_collector.get_metrics()
         return jsonify(all_metrics)
     except Exception as e:
-        logger.error("metrics_endpoint_error", error=str(e))
+        logger.exception("metrics_endpoint_error", error=str(e))
         return jsonify({"error": "Failed to retrieve metrics", "message": str(e)}), 500
 
 
@@ -538,7 +534,7 @@ def metrics_summary() -> tuple[Response, int] | Response:
         summary = metrics_collector.get_summary()
         return jsonify(summary)
     except Exception as e:
-        logger.error("metrics_summary_endpoint_error", error=str(e))
+        logger.exception("metrics_summary_endpoint_error", error=str(e))
         return jsonify({"error": "Failed to retrieve metrics summary", "message": str(e)}), 500
 
 
@@ -559,7 +555,7 @@ def metrics_prometheus() -> tuple[str, int, dict[str, str]]:
         prometheus_text = metrics_collector.export_prometheus()
         return prometheus_text, 200, {"Content-Type": "text/plain; charset=utf-8"}
     except Exception as e:
-        logger.error("prometheus_metrics_endpoint_error", error=str(e))
+        logger.exception("prometheus_metrics_endpoint_error", error=str(e))
         return (
             f"# Error exporting metrics: {e!s}\n",
             500,

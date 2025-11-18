@@ -11,7 +11,7 @@ API Documentation: https://developer.sallinggroup.com/
 """
 
 import os
-from datetime import date, datetime, timedelta
+from datetime import UTC, date, datetime, timedelta
 from typing import Any
 
 import requests

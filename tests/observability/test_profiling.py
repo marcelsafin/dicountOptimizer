@@ -41,7 +41,7 @@ class TestProfileOperation:
 
     def test_profile_operation_multiple_calls(self, collector):
         """Test profiling multiple calls to same operation."""
-        for i in range(3):
+        for _i in range(3):
             with profile_operation("repeated_operation"):
                 time.sleep(0.005)  # 5ms
 

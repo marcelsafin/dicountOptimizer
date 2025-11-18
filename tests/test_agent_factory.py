@@ -6,7 +6,6 @@ with proper dependency injection, configuration validation, and support for
 test doubles.
 """
 
-
 import pytest
 
 from agents.discount_optimizer.agents.ingredient_mapper_agent import IngredientMapperAgent
@@ -324,7 +323,7 @@ class TestAgentFactoryConfigurationValidation:
         # Create config with invalid temperature
         try:
             invalid_config = Settings(agent_temperature=3.0)  # type: ignore[call-arg]
-            factory = AgentFactory(config=invalid_config)
+            AgentFactory(config=invalid_config)
             # If we get here, validation didn't catch it
             # This is expected if pydantic validation happens at Settings level
             assert True
@@ -336,7 +335,7 @@ class TestAgentFactoryConfigurationValidation:
         """Test validation fails with invalid max tokens."""
         try:
             invalid_config = Settings(agent_max_tokens=-100)  # type: ignore[call-arg]
-            factory = AgentFactory(config=invalid_config)
+            AgentFactory(config=invalid_config)
             # If we get here, validation didn't catch it
             assert True
         except ValueError:

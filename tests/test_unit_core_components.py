@@ -14,6 +14,8 @@ Requirements: All requirements
 import unittest
 from datetime import date, timedelta
 
+import pytest
+
 from agents.discount_optimizer.discount_matcher import DiscountMatcher
 from agents.discount_optimizer.input_validator import InputValidator, ValidationError
 from agents.discount_optimizer.meal_suggester import MealSuggester
@@ -38,25 +40,25 @@ class TestInputValidator(unittest.TestCase):
     def test_validate_location_coordinates_valid(self):
         """Test validation of valid coordinates."""
         # Copenhagen coordinates
-        self.assertTrue(self.validator.validate_location_coordinates(55.6761, 12.5683))
+        assert self.validator.validate_location_coordinates(55.6761, 12.5683)
 
         # Edge cases
-        self.assertTrue(self.validator.validate_location_coordinates(90, 180))
-        self.assertTrue(self.validator.validate_location_coordinates(-90, -180))
-        self.assertTrue(self.validator.validate_location_coordinates(0, 0))
+        assert self.validator.validate_location_coordinates(90, 180)
+        assert self.validator.validate_location_coordinates(-90, -180)
+        assert self.validator.validate_location_coordinates(0, 0)
 
     def test_validate_location_coordinates_invalid(self):
         """Test validation of invalid coordinates."""
         # Latitude out of range
-        self.assertFalse(self.validator.validate_location_coordinates(91, 12.5683))
-        self.assertFalse(self.validator.validate_location_coordinates(-91, 12.5683))
+        assert not self.validator.validate_location_coordinates(91, 12.5683)
+        assert not self.validator.validate_location_coordinates(-91, 12.5683)
 
         # Longitude out of range
-        self.assertFalse(self.validator.validate_location_coordinates(55.6761, 181))
-        self.assertFalse(self.validator.validate_location_coordinates(55.6761, -181))
+        assert not self.validator.validate_location_coordinates(55.6761, 181)
+        assert not self.validator.validate_location_coordinates(55.6761, -181)
 
         # Both out of range
-        self.assertFalse(self.validator.validate_location_coordinates(100, 200))
+        assert not self.validator.validate_location_coordinates(100, 200)
 
     def test_validate_location_with_coordinates(self):
         """Test location validation with coordinate dict."""
@@ -64,71 +66,65 @@ class TestInputValidator(unittest.TestCase):
 
         location = self.validator._validate_location(location_data)
 
-        self.assertIsInstance(location, Location)
-        self.assertEqual(location.latitude, 55.6761)
-        self.assertEqual(location.longitude, 12.5683)
+        assert isinstance(location, Location)
+        assert location.latitude == 55.6761
+        assert location.longitude == 12.5683
 
     def test_validate_location_invalid_coordinates(self):
         """Test location validation with invalid coordinates."""
         location_data = {"latitude": 100, "longitude": 200}
 
-        with self.assertRaises(ValidationError):
+        with pytest.raises(ValidationError):
             self.validator._validate_location(location_data)
 
     def test_validate_preferences_all_selected(self):
         """Test preferences validation with all options selected."""
-        self.assertTrue(
-            self.validator.validate_preferences(
-                maximize_savings=True, minimize_stores=True, prefer_organic=True
-            )
+        assert self.validator.validate_preferences(
+            maximize_savings=True, minimize_stores=True, prefer_organic=True
         )
 
     def test_validate_preferences_one_selected(self):
         """Test preferences validation with one option selected."""
-        self.assertTrue(
-            self.validator.validate_preferences(
-                maximize_savings=True, minimize_stores=False, prefer_organic=False
-            )
+        assert self.validator.validate_preferences(
+            maximize_savings=True, minimize_stores=False, prefer_organic=False
         )
 
     def test_validate_preferences_none_selected(self):
         """Test preferences validation with no options selected."""
-        self.assertFalse(
-            self.validator.validate_preferences(
-                maximize_savings=False, minimize_stores=False, prefer_organic=False
-            )
+        assert not self.validator.validate_preferences(
+            maximize_savings=False, minimize_stores=False, prefer_organic=False
         )
 
     def test_parse_timeframe_this_week(self):
         """Test parsing 'this week' timeframe."""
         timeframe = self.validator.parse_timeframe("this week")
 
-        self.assertIsInstance(timeframe, Timeframe)
-        self.assertEqual(timeframe.start_date, date.today())
-        self.assertEqual(timeframe.end_date, date.today() + timedelta(days=7))
+        assert isinstance(timeframe, Timeframe)
+        assert timeframe.start_date == date.today()
+        assert timeframe.end_date == date.today() + timedelta(days=7)
 
     def test_parse_timeframe_next_week(self):
         """Test parsing 'next week' timeframe."""
         timeframe = self.validator.parse_timeframe("next week")
 
-        self.assertIsInstance(timeframe, Timeframe)
-        self.assertGreater(timeframe.start_date, date.today())
-        self.assertEqual((timeframe.end_date - timeframe.start_date).days, 7)
+        assert isinstance(timeframe, Timeframe)
+        assert timeframe.start_date > date.today()
+        assert (timeframe.end_date - timeframe.start_date).days == 7
 
     def test_parse_timeframe_today(self):
         """Test parsing 'today' timeframe."""
         timeframe = self.validator.parse_timeframe("today")
 
-        self.assertEqual(timeframe.start_date, date.today())
-        self.assertEqual(timeframe.end_date, date.today())
+        assert timeframe.start_date == date.today()
+        assert timeframe.end_date == date.today()
 
     def test_validate_meal_plan_valid(self):
         """Test meal plan validation with valid list."""
-        self.assertTrue(self.validator.validate_meal_plan(["taco", "pasta"]))
+        assert self.validator.validate_meal_plan(["taco", "pasta"])
 
     def test_validate_meal_plan_empty(self):
         """Test meal plan validation with empty list."""
-        self.assertFalse(self.validator.validate_meal_plan([]))
+        assert not self.validator.validate_meal_plan([])
 
 
 class TestDiscountMatcher(unittest.TestCase):
@@ -177,16 +173,16 @@ class TestDiscountMatcher(unittest.TestCase):
         distance = self.matcher.calculate_distance(self.copenhagen_center, self.norrebro)
 
         # Expected distance is approximately 1.5 km
-        self.assertGreater(distance, 1.0)
-        self.assertLess(distance, 2.5)
+        assert distance > 1.0
+        assert distance < 2.5
 
     def test_calculate_distance_copenhagen_vesterbro(self):
         """Test distance calculation between Copenhagen center and Vesterbro."""
         distance = self.matcher.calculate_distance(self.copenhagen_center, self.vesterbro)
 
         # Expected distance is approximately 1.2 km
-        self.assertGreater(distance, 0.5)
-        self.assertLess(distance, 2.0)
+        assert distance > 0.5
+        assert distance < 2.0
 
     def test_calculate_distance_symmetry(self):
         """Test that distance calculation is symmetric."""
@@ -205,7 +201,7 @@ class TestDiscountMatcher(unittest.TestCase):
         )
 
         # Both stores should be within 2km
-        self.assertEqual(len(filtered), 2)
+        assert len(filtered) == 2
 
     def test_filter_by_location_outside_radius(self):
         """Test filtering discounts outside radius."""
@@ -217,7 +213,7 @@ class TestDiscountMatcher(unittest.TestCase):
         )
 
         # No stores should be within 0.5km
-        self.assertEqual(len(filtered), 0)
+        assert len(filtered) == 0
 
     def test_filter_by_timeframe_valid(self):
         """Test filtering discounts within timeframe."""
@@ -228,7 +224,7 @@ class TestDiscountMatcher(unittest.TestCase):
         filtered = self.matcher.filter_by_timeframe(discounts, timeframe)
 
         # Both discounts expire within timeframe
-        self.assertEqual(len(filtered), 2)
+        assert len(filtered) == 2
 
     def test_filter_by_timeframe_expired(self):
         """Test filtering expired discounts."""
@@ -248,7 +244,7 @@ class TestDiscountMatcher(unittest.TestCase):
         filtered = self.matcher.filter_by_timeframe([expired_discount], timeframe)
 
         # Expired discount should be filtered out
-        self.assertEqual(len(filtered), 0)
+        assert len(filtered) == 0
 
 
 class TestMealSuggester(unittest.TestCase):
@@ -270,10 +266,10 @@ class TestMealSuggester(unittest.TestCase):
 
         prompt = self.suggester._create_prompt(products, user_preferences="", num_meals=3)
 
-        self.assertIn("Tortillas", prompt)
-        self.assertIn("Hakket oksekød", prompt)
-        self.assertIn("Ost", prompt)
-        self.assertIn("3", prompt)
+        assert "Tortillas" in prompt
+        assert "Hakket oksekød" in prompt
+        assert "Ost" in prompt
+        assert "3" in prompt
 
     def test_create_prompt_with_preferences(self):
         """Test prompt creation with user preferences."""
@@ -282,7 +278,7 @@ class TestMealSuggester(unittest.TestCase):
 
         prompt = self.suggester._create_prompt(products, user_preferences=preferences, num_meals=2)
 
-        self.assertIn("vegetarian meals", prompt)
+        assert "vegetarian meals" in prompt
 
     def test_create_prompt_with_product_details(self):
         """Test prompt creation with detailed product information."""
@@ -304,8 +300,8 @@ class TestMealSuggester(unittest.TestCase):
             products, user_preferences="", num_meals=2, product_details=product_details
         )
 
-        self.assertIn("URGENT", prompt)
-        self.assertIn("30%", prompt)
+        assert "URGENT" in prompt
+        assert "30%" in prompt
 
     def test_parse_response_simple(self):
         """Test parsing simple meal list response."""
@@ -315,10 +311,10 @@ class TestMealSuggester(unittest.TestCase):
 
         meals = self.suggester._parse_response(response)
 
-        self.assertEqual(len(meals), 3)
-        self.assertIn("Taco Tuesday", meals)
-        self.assertIn("Pasta Bolognese", meals)
-        self.assertIn("Grøntsagssuppe", meals)
+        assert len(meals) == 3
+        assert "Taco Tuesday" in meals
+        assert "Pasta Bolognese" in meals
+        assert "Grøntsagssuppe" in meals
 
     def test_parse_response_with_bullets(self):
         """Test parsing response with bullet points."""
@@ -328,8 +324,8 @@ class TestMealSuggester(unittest.TestCase):
 
         meals = self.suggester._parse_response(response)
 
-        self.assertEqual(len(meals), 3)
-        self.assertIn("Morgenmad Burrito", meals)
+        assert len(meals) == 3
+        assert "Morgenmad Burrito" in meals
 
     def test_parse_response_mixed_format(self):
         """Test parsing response with mixed formatting."""
@@ -339,7 +335,7 @@ class TestMealSuggester(unittest.TestCase):
 
         meals = self.suggester._parse_response(response)
 
-        self.assertEqual(len(meals), 3)
+        assert len(meals) == 3
 
     def test_fallback_suggestions(self):
         """Test fallback meal suggestions."""
@@ -347,8 +343,8 @@ class TestMealSuggester(unittest.TestCase):
 
         meals = self.suggester._fallback_suggestions(products, num_meals=3)
 
-        self.assertEqual(len(meals), 3)
-        self.assertIsInstance(meals[0], str)
+        assert len(meals) == 3
+        assert isinstance(meals[0], str)
 
 
 class TestSavingsCalculator(unittest.TestCase):
@@ -380,19 +376,19 @@ class TestSavingsCalculator(unittest.TestCase):
         """Test monetary savings calculation with single purchase."""
         savings = self.calculator.calculate_monetary_savings([self.purchase1])
 
-        self.assertEqual(savings, 10.0)
+        assert savings == 10.0
 
     def test_calculate_monetary_savings_multiple(self):
         """Test monetary savings calculation with multiple purchases."""
         savings = self.calculator.calculate_monetary_savings([self.purchase1, self.purchase2])
 
-        self.assertEqual(savings, 15.0)
+        assert savings == 15.0
 
     def test_calculate_monetary_savings_empty(self):
         """Test monetary savings calculation with no purchases."""
         savings = self.calculator.calculate_monetary_savings([])
 
-        self.assertEqual(savings, 0.0)
+        assert savings == 0.0
 
     def test_calculate_time_savings_returns_float(self):
         """Test that time savings calculation returns a float."""
@@ -400,7 +396,7 @@ class TestSavingsCalculator(unittest.TestCase):
 
         time_savings = self.calculator.calculate_time_savings([self.purchase1], copenhagen)
 
-        self.assertIsInstance(time_savings, float)
+        assert isinstance(time_savings, float)
 
 
 class TestOutputFormatter(unittest.TestCase):
@@ -447,15 +443,15 @@ class TestOutputFormatter(unittest.TestCase):
         grouped = self.formatter.group_by_store_and_day(purchases)
 
         # Should have 2 stores
-        self.assertEqual(len(grouped), 2)
-        self.assertIn("Netto", grouped)
-        self.assertIn("Føtex", grouped)
+        assert len(grouped) == 2
+        assert "Netto" in grouped
+        assert "Føtex" in grouped
 
         # Netto should have 2 days
-        self.assertEqual(len(grouped["Netto"]), 2)
+        assert len(grouped["Netto"]) == 2
 
         # Føtex should have 1 day
-        self.assertEqual(len(grouped["Føtex"]), 1)
+        assert len(grouped["Føtex"]) == 1
 
     def test_generate_tips_time_sensitive(self):
         """Test tip generation for time-sensitive products."""
@@ -472,8 +468,8 @@ class TestOutputFormatter(unittest.TestCase):
 
         tips = self.formatter.generate_tips([urgent_purchase])
 
-        self.assertGreater(len(tips), 0)
-        self.assertLessEqual(len(tips), 3)
+        assert len(tips) > 0
+        assert len(tips) <= 3
 
     def test_generate_tips_organic(self):
         """Test tip generation for organic products."""
@@ -489,7 +485,7 @@ class TestOutputFormatter(unittest.TestCase):
         tips = self.formatter.generate_tips([purchase])
 
         # Should generate tip for organic product with good savings
-        self.assertGreater(len(tips), 0)
+        assert len(tips) > 0
 
     def test_generate_tips_max_three(self):
         """Test that tips are limited to maximum 3."""
@@ -507,23 +503,23 @@ class TestOutputFormatter(unittest.TestCase):
 
         tips = self.formatter.generate_tips(purchases)
 
-        self.assertLessEqual(len(tips), 3)
+        assert len(tips) <= 3
 
     def test_generate_motivation_high_savings(self):
         """Test motivation message for high savings."""
         motivation = self.formatter.generate_motivation(total_savings=150.0, time_savings=1.5)
 
-        self.assertIn("150", motivation)
-        self.assertIn("kr", motivation)
-        self.assertIsInstance(motivation, str)
-        self.assertGreater(len(motivation), 10)
+        assert "150" in motivation
+        assert "kr" in motivation
+        assert isinstance(motivation, str)
+        assert len(motivation) > 10
 
     def test_generate_motivation_low_savings(self):
         """Test motivation message for low savings."""
         motivation = self.formatter.generate_motivation(total_savings=30.0, time_savings=0.2)
 
-        self.assertIn("30", motivation)
-        self.assertIsInstance(motivation, str)
+        assert "30" in motivation
+        assert isinstance(motivation, str)
 
     def test_format_recommendation_complete(self):
         """Test complete recommendation formatting."""
@@ -538,13 +534,13 @@ class TestOutputFormatter(unittest.TestCase):
         output = self.formatter.format_recommendation(recommendation)
 
         # Check for key sections
-        self.assertIn("SHOPPING", output)
-        self.assertIn("SAVINGS", output)
-        self.assertIn("TIPS", output)
-        self.assertIn("Netto", output)
-        self.assertIn("Føtex", output)
-        self.assertIn("13", output)
-        self.assertIn("Great job!", output)
+        assert "SHOPPING" in output
+        assert "SAVINGS" in output
+        assert "TIPS" in output
+        assert "Netto" in output
+        assert "Føtex" in output
+        assert "13" in output
+        assert "Great job!" in output
 
     def test_format_recommendation_structure(self):
         """Test that formatted output has proper structure."""
@@ -560,10 +556,10 @@ class TestOutputFormatter(unittest.TestCase):
 
         # Should have multiple lines
         lines = output.split("\n")
-        self.assertGreater(len(lines), 10)
+        assert len(lines) > 10
 
         # Should have separators
-        self.assertIn("=" * 60, output)
+        assert "=" * 60 in output
 
 
 if __name__ == "__main__":
