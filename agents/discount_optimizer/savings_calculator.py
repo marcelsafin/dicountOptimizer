@@ -65,7 +65,7 @@ class SavingsCalculator:
 
         # Calculate baseline time: shopping at closest store
         closest_distance = float("inf")
-        for store_name, store_location in store_locations.items():
+        for _store_name, store_location in store_locations.items():
             distance = self.discount_matcher.calculate_distance(user_location, store_location)
             closest_distance = min(closest_distance, distance)
 
