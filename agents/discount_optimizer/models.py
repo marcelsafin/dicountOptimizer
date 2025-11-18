@@ -3,13 +3,13 @@ Data models for the Shopping Optimizer system.
 """
 
 from dataclasses import dataclass
-from datetime import date, datetime, timedelta
-from typing import List, Dict
+from datetime import date, timedelta
 
 
 @dataclass
 class Location:
     """Represents a geographic location with coordinates."""
+
     latitude: float
     longitude: float
 
@@ -17,6 +17,7 @@ class Location:
 @dataclass
 class Timeframe:
     """Represents a time period for shopping."""
+
     start_date: date
     end_date: date
 
@@ -24,6 +25,7 @@ class Timeframe:
 @dataclass
 class OptimizationPreferences:
     """User preferences for optimization criteria."""
+
     maximize_savings: bool
     minimize_stores: bool
     prefer_organic: bool
@@ -32,8 +34,9 @@ class OptimizationPreferences:
 @dataclass
 class UserInput:
     """Complete user input for shopping optimization."""
+
     location: Location
-    meal_plan: List[str]
+    meal_plan: list[str]
     preferences: OptimizationPreferences
     timeframe: Timeframe
 
@@ -41,6 +44,7 @@ class UserInput:
 @dataclass
 class DiscountItem:
     """Represents a discounted product at a specific store."""
+
     product_name: str
     store_name: str
     store_location: Location
@@ -57,6 +61,7 @@ class DiscountItem:
 @dataclass
 class Purchase:
     """Represents a recommended purchase."""
+
     product_name: str
     store_name: str
     purchase_day: date
@@ -68,16 +73,17 @@ class Purchase:
 @dataclass
 class ShoppingRecommendation:
     """Complete shopping recommendation output."""
-    purchases: List[Purchase]
+
+    purchases: list[Purchase]
     total_savings: float
     time_savings: float
-    tips: List[str]
+    tips: list[str]
     motivation_message: str
 
 
 # Mock discount data with Danish stores near Copenhagen
 # Copenhagen coordinates: approximately 55.6761° N, 12.5683° E
-MOCK_DISCOUNTS: List[DiscountItem] = [
+MOCK_DISCOUNTS: list[DiscountItem] = [
     # Netto - Nørrebro (North of Copenhagen center)
     DiscountItem(
         product_name="Tortillas",
@@ -90,7 +96,7 @@ MOCK_DISCOUNTS: List[DiscountItem] = [
         is_organic=False,
         store_address="Nørrebrogade 45, 2200 København N",
         travel_distance_km=1.5,
-        travel_time_minutes=8.0
+        travel_time_minutes=8.0,
     ),
     DiscountItem(
         product_name="Hakket oksekød",
@@ -103,7 +109,7 @@ MOCK_DISCOUNTS: List[DiscountItem] = [
         is_organic=False,
         store_address="Nørrebrogade 45, 2200 København N",
         travel_distance_km=1.5,
-        travel_time_minutes=8.0
+        travel_time_minutes=8.0,
     ),
     DiscountItem(
         product_name="Ost",
@@ -116,7 +122,7 @@ MOCK_DISCOUNTS: List[DiscountItem] = [
         is_organic=False,
         store_address="Nørrebrogade 45, 2200 København N",
         travel_distance_km=1.5,
-        travel_time_minutes=8.0
+        travel_time_minutes=8.0,
     ),
     DiscountItem(
         product_name="Salat",
@@ -129,9 +135,8 @@ MOCK_DISCOUNTS: List[DiscountItem] = [
         is_organic=True,
         store_address="Nørrebrogade 45, 2200 København N",
         travel_distance_km=1.5,
-        travel_time_minutes=8.0
+        travel_time_minutes=8.0,
     ),
-    
     # Føtex - Vesterbro (West of Copenhagen center)
     DiscountItem(
         product_name="Økologisk hakket oksekød",
@@ -144,7 +149,7 @@ MOCK_DISCOUNTS: List[DiscountItem] = [
         is_organic=True,
         store_address="Vesterbrogade 89, 1620 København V",
         travel_distance_km=1.2,
-        travel_time_minutes=6.0
+        travel_time_minutes=6.0,
     ),
     DiscountItem(
         product_name="Creme fraiche",
@@ -157,7 +162,7 @@ MOCK_DISCOUNTS: List[DiscountItem] = [
         is_organic=False,
         store_address="Vesterbrogade 89, 1620 København V",
         travel_distance_km=1.2,
-        travel_time_minutes=6.0
+        travel_time_minutes=6.0,
     ),
     DiscountItem(
         product_name="Salsa",
@@ -170,7 +175,7 @@ MOCK_DISCOUNTS: List[DiscountItem] = [
         is_organic=False,
         store_address="Vesterbrogade 89, 1620 København V",
         travel_distance_km=1.2,
-        travel_time_minutes=6.0
+        travel_time_minutes=6.0,
     ),
     DiscountItem(
         product_name="Tomater",
@@ -183,7 +188,7 @@ MOCK_DISCOUNTS: List[DiscountItem] = [
         is_organic=True,
         store_address="Vesterbrogade 89, 1620 København V",
         travel_distance_km=1.2,
-        travel_time_minutes=6.0
+        travel_time_minutes=6.0,
     ),
     DiscountItem(
         product_name="Pasta",
@@ -196,9 +201,8 @@ MOCK_DISCOUNTS: List[DiscountItem] = [
         is_organic=False,
         store_address="Vesterbrogade 89, 1620 København V",
         travel_distance_km=1.2,
-        travel_time_minutes=6.0
+        travel_time_minutes=6.0,
     ),
-    
     # Rema 1000 - Østerbro (East of Copenhagen center)
     DiscountItem(
         product_name="Tortillas",
@@ -211,7 +215,7 @@ MOCK_DISCOUNTS: List[DiscountItem] = [
         is_organic=False,
         store_address="Østerbrogade 112, 2100 København Ø",
         travel_distance_km=2.8,
-        travel_time_minutes=12.0
+        travel_time_minutes=12.0,
     ),
     DiscountItem(
         product_name="Tomatpuré",
@@ -224,7 +228,7 @@ MOCK_DISCOUNTS: List[DiscountItem] = [
         is_organic=False,
         store_address="Østerbrogade 112, 2100 København Ø",
         travel_distance_km=2.8,
-        travel_time_minutes=12.0
+        travel_time_minutes=12.0,
     ),
     DiscountItem(
         product_name="Økologisk ost",
@@ -237,7 +241,7 @@ MOCK_DISCOUNTS: List[DiscountItem] = [
         is_organic=True,
         store_address="Østerbrogade 112, 2100 København Ø",
         travel_distance_km=2.8,
-        travel_time_minutes=12.0
+        travel_time_minutes=12.0,
     ),
     DiscountItem(
         product_name="Løg",
@@ -250,9 +254,8 @@ MOCK_DISCOUNTS: List[DiscountItem] = [
         is_organic=False,
         store_address="Østerbrogade 112, 2100 København Ø",
         travel_distance_km=2.8,
-        travel_time_minutes=12.0
+        travel_time_minutes=12.0,
     ),
-    
     # Netto - Amager (South of Copenhagen)
     DiscountItem(
         product_name="Gulerødder",
@@ -265,7 +268,7 @@ MOCK_DISCOUNTS: List[DiscountItem] = [
         is_organic=False,
         store_address="Amagerbrogade 55, 2300 København S",
         travel_distance_km=3.5,
-        travel_time_minutes=15.0
+        travel_time_minutes=15.0,
     ),
     DiscountItem(
         product_name="Kartofler",
@@ -278,7 +281,7 @@ MOCK_DISCOUNTS: List[DiscountItem] = [
         is_organic=False,
         store_address="Amagerbrogade 55, 2300 København S",
         travel_distance_km=3.5,
-        travel_time_minutes=15.0
+        travel_time_minutes=15.0,
     ),
     DiscountItem(
         product_name="Grøntsagsbouillon",
@@ -291,7 +294,7 @@ MOCK_DISCOUNTS: List[DiscountItem] = [
         is_organic=False,
         store_address="Amagerbrogade 55, 2300 København S",
         travel_distance_km=3.5,
-        travel_time_minutes=15.0
+        travel_time_minutes=15.0,
     ),
     DiscountItem(
         product_name="Bønner",
@@ -304,9 +307,8 @@ MOCK_DISCOUNTS: List[DiscountItem] = [
         is_organic=False,
         store_address="Amagerbrogade 55, 2300 København S",
         travel_distance_km=3.5,
-        travel_time_minutes=15.0
+        travel_time_minutes=15.0,
     ),
-    
     # Føtex - City Center
     DiscountItem(
         product_name="Hvidløg",
@@ -319,7 +321,7 @@ MOCK_DISCOUNTS: List[DiscountItem] = [
         is_organic=False,
         store_address="Frederiksberggade 21, 1459 København K",
         travel_distance_km=0.5,
-        travel_time_minutes=3.0
+        travel_time_minutes=3.0,
     ),
     DiscountItem(
         product_name="Parmesan",
@@ -332,7 +334,7 @@ MOCK_DISCOUNTS: List[DiscountItem] = [
         is_organic=False,
         store_address="Frederiksberggade 21, 1459 København K",
         travel_distance_km=0.5,
-        travel_time_minutes=3.0
+        travel_time_minutes=3.0,
     ),
     DiscountItem(
         product_name="Selleri",
@@ -345,69 +347,18 @@ MOCK_DISCOUNTS: List[DiscountItem] = [
         is_organic=True,
         store_address="Frederiksberggade 21, 1459 København K",
         travel_distance_km=0.5,
-        travel_time_minutes=3.0
+        travel_time_minutes=3.0,
     ),
 ]
 
 
 # Meal-to-ingredients mapping database
-MEAL_INGREDIENTS: Dict[str, List[str]] = {
-    "taco": [
-        "tortillas",
-        "hakket oksekød",
-        "ost",
-        "creme fraiche",
-        "salsa",
-        "salat",
-        "tomater"
-    ],
-    "tacos": [
-        "tortillas",
-        "hakket oksekød",
-        "ost",
-        "creme fraiche",
-        "salsa",
-        "salat",
-        "tomater"
-    ],
-    "pasta": [
-        "pasta",
-        "tomatpuré",
-        "hakket oksekød",
-        "parmesan",
-        "hvidløg",
-        "løg"
-    ],
-    "pasta bolognese": [
-        "pasta",
-        "tomatpuré",
-        "hakket oksekød",
-        "parmesan",
-        "hvidløg",
-        "løg"
-    ],
-    "grøntsagssuppe": [
-        "grøntsagsbouillon",
-        "gulerødder",
-        "selleri",
-        "løg",
-        "kartofler",
-        "bønner"
-    ],
-    "veggie soup": [
-        "grøntsagsbouillon",
-        "gulerødder",
-        "selleri",
-        "løg",
-        "kartofler",
-        "bønner"
-    ],
-    "vegetable soup": [
-        "grøntsagsbouillon",
-        "gulerødder",
-        "selleri",
-        "løg",
-        "kartofler",
-        "bønner"
-    ],
+MEAL_INGREDIENTS: dict[str, list[str]] = {
+    "taco": ["tortillas", "hakket oksekød", "ost", "creme fraiche", "salsa", "salat", "tomater"],
+    "tacos": ["tortillas", "hakket oksekød", "ost", "creme fraiche", "salsa", "salat", "tomater"],
+    "pasta": ["pasta", "tomatpuré", "hakket oksekød", "parmesan", "hvidløg", "løg"],
+    "pasta bolognese": ["pasta", "tomatpuré", "hakket oksekød", "parmesan", "hvidløg", "løg"],
+    "grøntsagssuppe": ["grøntsagsbouillon", "gulerødder", "selleri", "løg", "kartofler", "bønner"],
+    "veggie soup": ["grøntsagsbouillon", "gulerødder", "selleri", "løg", "kartofler", "bønner"],
+    "vegetable soup": ["grøntsagsbouillon", "gulerødder", "selleri", "løg", "kartofler", "bønner"],
 }

@@ -6,40 +6,41 @@ optimization pipeline. Each agent has a single responsibility and uses
 typed tool functions with Pydantic input/output models.
 """
 
+from .ingredient_mapper_agent import (
+    IngredientMapperAgent,
+    IngredientMapping,
+    IngredientMappingInput,
+    IngredientMappingOutput,
+    ProductMatch,
+)
 from .meal_suggester_agent import (
     MealSuggesterAgent,
     MealSuggestionInput,
     MealSuggestionOutput,
 )
-from .ingredient_mapper_agent import (
-    IngredientMapperAgent,
-    IngredientMappingInput,
-    IngredientMappingOutput,
-    IngredientMapping,
-    ProductMatch,
-)
 from .output_formatter_agent import (
-    OutputFormatterAgent,
     FormattingInput,
     FormattingOutput,
+    OutputFormatterAgent,
 )
 from .shopping_optimizer_agent import (
     ShoppingOptimizerAgent,
     ShoppingOptimizerInput,
 )
 
+
 __all__ = [
-    'MealSuggesterAgent',
-    'MealSuggestionInput',
-    'MealSuggestionOutput',
-    'IngredientMapperAgent',
-    'IngredientMappingInput',
-    'IngredientMappingOutput',
-    'IngredientMapping',
-    'ProductMatch',
-    'OutputFormatterAgent',
-    'FormattingInput',
-    'FormattingOutput',
-    'ShoppingOptimizerAgent',
-    'ShoppingOptimizerInput',
+    "FormattingInput",
+    "FormattingOutput",
+    "IngredientMapperAgent",
+    "IngredientMapping",
+    "IngredientMappingInput",
+    "IngredientMappingOutput",
+    "MealSuggesterAgent",
+    "MealSuggestionInput",
+    "MealSuggestionOutput",
+    "OutputFormatterAgent",
+    "ProductMatch",
+    "ShoppingOptimizerAgent",
+    "ShoppingOptimizerInput",
 ]

@@ -12,15 +12,16 @@ Tests cover:
 Requirements: 2.1, 2.3, 3.1, 3.3
 """
 
-import pytest
-from decimal import Decimal
 from datetime import date, timedelta
-from unittest.mock import Mock, AsyncMock, patch, MagicMock
+from decimal import Decimal
+from unittest.mock import MagicMock
+
+import pytest
 
 from agents.discount_optimizer.agents.output_formatter_agent import (
-    OutputFormatterAgent,
     FormattingInput,
-    FormattingOutput
+    FormattingOutput,
+    OutputFormatterAgent,
 )
 from agents.discount_optimizer.domain.models import Purchase, ShoppingRecommendation
 
@@ -28,6 +29,7 @@ from agents.discount_optimizer.domain.models import Purchase, ShoppingRecommenda
 # ============================================================================
 # Fixtures
 # ============================================================================
+
 
 @pytest.fixture
 def mock_gemini_json_response() -> str:
@@ -55,7 +57,7 @@ def mock_gemini_invalid_json_response() -> str:
 def sample_purchases() -> list[Purchase]:
     """Create sample purchases for testing."""
     today = date.today()
-    
+
     return [
         Purchase(
             product_name="Tortillas 8 stk",
@@ -63,7 +65,7 @@ def sample_purchases() -> list[Purchase]:
             purchase_day=today,
             price=Decimal("14.95"),
             savings=Decimal("10.00"),
-            meal_association="Taco Tuesday"
+            meal_association="Taco Tuesday",
         ),
         Purchase(
             product_name="Hakket oksekød 8-12%",
@@ -71,7 +73,7 @@ def sample_purchases() -> list[Purchase]:
             purchase_day=today,
             price=Decimal("35.00"),
             savings=Decimal("15.00"),
-            meal_association="Taco Tuesday"
+            meal_association="Taco Tuesday",
         ),
         Purchase(
             product_name="Pasta 500g",
@@ -79,8 +81,8 @@ def sample_purchases() -> list[Purchase]:
             purchase_day=today + timedelta(days=1),
             price=Decimal("12.00"),
             savings=Decimal("6.00"),
-            meal_association="Pasta Carbonara"
-        )
+            meal_association="Pasta Carbonara",
+        ),
     ]
 
 
@@ -92,14 +94,14 @@ def sample_stores() -> list[dict]:
             "name": "Føtex",
             "address": "Nørrebrogade 123, Copenhagen",
             "distance_km": 1.2,
-            "travel_time_minutes": 5.0
+            "travel_time_minutes": 5.0,
         },
         {
             "name": "Netto",
             "address": "Vesterbrogade 456, Copenhagen",
             "distance_km": 2.5,
-            "travel_time_minutes": 10.0
-        }
+            "travel_time_minutes": 10.0,
+        },
     ]
 
 
@@ -112,13 +114,14 @@ def formatting_input(sample_purchases, sample_stores) -> FormattingInput:
         time_savings=15.0,
         stores=sample_stores,
         user_context="Family of 4, busy weeknights",
-        num_tips=5
+        num_tips=5,
     )
 
 
 # ============================================================================
 # Input/Output Model Validation Tests
 # ============================================================================
+
 
 def test_input_validation_valid(sample_purchases, sample_stores):
     """Test that valid input is accepted."""
@@ -127,9 +130,9 @@ def test_input_validation_valid(sample_purchases, sample_stores):
         total_savings=Decimal("31.00"),
         time_savings=15.0,
         stores=sample_stores,
-        num_tips=5
+        num_tips=5,
     )
-    
+
     assert len(input_data.purchases) == 3
     assert input_data.total_savings == Decimal("31.00")
     assert input_data.time_savings == 15.0
@@ -140,13 +143,9 @@ def test_input_validation_valid(sample_purchases, sample_stores):
 def test_input_validation_empty_purchases():
     """Test that empty purchases list is accepted."""
     input_data = FormattingInput(
-        purchases=[],
-        total_savings=Decimal("0.00"),
-        time_savings=0.0,
-        stores=[],
-        num_tips=3
+        purchases=[], total_savings=Decimal("0.00"), time_savings=0.0, stores=[], num_tips=3
     )
-    
+
     assert len(input_data.purchases) == 0
     assert input_data.total_savings == Decimal("0.00")
 
@@ -155,11 +154,7 @@ def test_input_validation_negative_savings():
     """Test that negative savings is rejected."""
     with pytest.raises(Exception):  # Pydantic ValidationError
         FormattingInput(
-            purchases=[],
-            total_savings=Decimal("-10.00"),
-            time_savings=0.0,
-            stores=[],
-            num_tips=3
+            purchases=[], total_savings=Decimal("-10.00"), time_savings=0.0, stores=[], num_tips=3
         )
 
 
@@ -171,7 +166,7 @@ def test_input_validation_invalid_num_tips():
             total_savings=Decimal("0.00"),
             time_savings=0.0,
             stores=[],
-            num_tips=0  # Must be >= 1
+            num_tips=0,  # Must be >= 1
         )
 
 
@@ -186,10 +181,10 @@ def test_output_validation_valid(sample_purchases, sample_stores):
             time_savings=15.0,
             tips=["Tip 1", "Tip 2", "Tip 3"],
             motivation_message="Great job planning ahead!",
-            stores=sample_stores
-        )
+            stores=sample_stores,
+        ),
     )
-    
+
     assert len(output.tips) == 3
     assert len(output.motivation_message) >= 10
     assert isinstance(output.formatted_recommendation, ShoppingRecommendation)
@@ -207,8 +202,8 @@ def test_output_validation_empty_tips():
                 time_savings=0.0,
                 tips=[],
                 motivation_message="Great job!",
-                stores=[]
-            )
+                stores=[],
+            ),
         )
 
 
@@ -224,8 +219,8 @@ def test_output_validation_short_motivation():
                 time_savings=0.0,
                 tips=["Tip 1"],
                 motivation_message="Hi",
-                stores=[]
-            )
+                stores=[],
+            ),
         )
 
 
@@ -233,12 +228,13 @@ def test_output_validation_short_motivation():
 # Fallback Formatting Tests
 # ============================================================================
 
+
 def test_fallback_tips_generation(formatting_input):
     """Test rule-based tip generation as fallback."""
     agent = OutputFormatterAgent()
-    
+
     tips = agent._generate_fallback_tips(formatting_input)
-    
+
     assert isinstance(tips, list)
     assert len(tips) <= formatting_input.num_tips
     assert all(isinstance(tip, str) for tip in tips)
@@ -248,17 +244,13 @@ def test_fallback_tips_generation(formatting_input):
 def test_fallback_motivation_high_savings():
     """Test motivation message for high savings."""
     agent = OutputFormatterAgent()
-    
+
     input_data = FormattingInput(
-        purchases=[],
-        total_savings=Decimal("150.00"),
-        time_savings=0.0,
-        stores=[],
-        num_tips=3
+        purchases=[], total_savings=Decimal("150.00"), time_savings=0.0, stores=[], num_tips=3
     )
-    
+
     motivation = agent._generate_fallback_motivation(input_data)
-    
+
     assert isinstance(motivation, str)
     assert len(motivation) > 10
     assert "150" in motivation or "saving" in motivation.lower()
@@ -267,17 +259,13 @@ def test_fallback_motivation_high_savings():
 def test_fallback_motivation_medium_savings():
     """Test motivation message for medium savings."""
     agent = OutputFormatterAgent()
-    
+
     input_data = FormattingInput(
-        purchases=[],
-        total_savings=Decimal("75.00"),
-        time_savings=0.0,
-        stores=[],
-        num_tips=3
+        purchases=[], total_savings=Decimal("75.00"), time_savings=0.0, stores=[], num_tips=3
     )
-    
+
     motivation = agent._generate_fallback_motivation(input_data)
-    
+
     assert isinstance(motivation, str)
     assert len(motivation) > 10
 
@@ -285,17 +273,13 @@ def test_fallback_motivation_medium_savings():
 def test_fallback_motivation_low_savings():
     """Test motivation message for low savings."""
     agent = OutputFormatterAgent()
-    
+
     input_data = FormattingInput(
-        purchases=[],
-        total_savings=Decimal("25.00"),
-        time_savings=0.0,
-        stores=[],
-        num_tips=3
+        purchases=[], total_savings=Decimal("25.00"), time_savings=0.0, stores=[], num_tips=3
     )
-    
+
     motivation = agent._generate_fallback_motivation(input_data)
-    
+
     assert isinstance(motivation, str)
     assert len(motivation) > 10
 
@@ -303,9 +287,9 @@ def test_fallback_motivation_low_savings():
 def test_fallback_formatting_complete(formatting_input):
     """Test complete fallback formatting."""
     agent = OutputFormatterAgent()
-    
+
     output = agent._fallback_formatting(formatting_input)
-    
+
     assert isinstance(output, FormattingOutput)
     assert len(output.tips) > 0
     assert len(output.motivation_message) >= 10
@@ -317,10 +301,11 @@ def test_fallback_formatting_complete(formatting_input):
 # Agent Initialization Tests
 # ============================================================================
 
+
 def test_agent_initialization_with_api_key():
     """Test agent initialization with explicit API key."""
     agent = OutputFormatterAgent(api_key="test-api-key")
-    
+
     assert agent.client is not None
     assert agent.model.startswith("models/")
 
@@ -329,7 +314,7 @@ def test_agent_initialization_without_api_key():
     """Test agent initialization without API key (uses settings)."""
     # This will use the API key from settings/environment
     agent = OutputFormatterAgent()
-    
+
     assert agent.client is not None
     assert agent.model.startswith("models/")
 
@@ -338,12 +323,13 @@ def test_agent_initialization_without_api_key():
 # Helper Method Tests
 # ============================================================================
 
+
 def test_format_shopping_context(formatting_input):
     """Test shopping context formatting for prompt."""
     agent = OutputFormatterAgent()
-    
+
     context = agent._format_shopping_context(formatting_input)
-    
+
     assert isinstance(context, str)
     assert "31" in context  # Total savings
     assert "15" in context  # Time savings
@@ -354,17 +340,13 @@ def test_format_shopping_context(formatting_input):
 def test_format_shopping_context_empty():
     """Test shopping context formatting with empty data."""
     agent = OutputFormatterAgent()
-    
+
     input_data = FormattingInput(
-        purchases=[],
-        total_savings=Decimal("0.00"),
-        time_savings=0.0,
-        stores=[],
-        num_tips=3
+        purchases=[], total_savings=Decimal("0.00"), time_savings=0.0, stores=[], num_tips=3
     )
-    
+
     context = agent._format_shopping_context(input_data)
-    
+
     assert isinstance(context, str)
     assert "0" in context  # Should show zero savings
 
@@ -372,9 +354,9 @@ def test_format_shopping_context_empty():
 def test_create_prompt(formatting_input):
     """Test prompt creation for Gemini."""
     agent = OutputFormatterAgent()
-    
+
     prompt = agent._create_prompt(formatting_input)
-    
+
     assert isinstance(prompt, str)
     assert len(prompt) > 100  # Should be substantial
     assert "tips" in prompt.lower()
@@ -385,9 +367,9 @@ def test_create_prompt(formatting_input):
 def test_system_instruction():
     """Test system instruction content."""
     agent = OutputFormatterAgent()
-    
+
     instruction = agent._get_system_instruction()
-    
+
     assert isinstance(instruction, str)
     assert len(instruction) > 50
     assert "shopping" in instruction.lower()
@@ -398,11 +380,10 @@ def test_system_instruction():
 # CRITICAL: Happy Path Tests (AI Integration)
 # ============================================================================
 
+
 @pytest.mark.asyncio
 async def test_format_output_parses_valid_json(
-    monkeypatch,
-    formatting_input: FormattingInput,
-    mock_gemini_json_response: str
+    monkeypatch, formatting_input: FormattingInput, mock_gemini_json_response: str
 ):
     """Test that agent correctly parses valid JSON response from Gemini (HAPPY PATH)."""
     # Mock the Gemini API response
@@ -411,18 +392,14 @@ async def test_format_output_parses_valid_json(
     mock_response.candidates = [MagicMock()]
     mock_response.candidates[0].content.parts = [MagicMock()]
     mock_response.candidates[0].content.parts[0].text = mock_gemini_json_response
-    
+
     # Patch the client's generate_content method
     agent = OutputFormatterAgent(api_key="test_key")
-    monkeypatch.setattr(
-        agent.client.models,
-        'generate_content',
-        lambda **kwargs: mock_response
-    )
-    
+    monkeypatch.setattr(agent.client.models, "generate_content", lambda **kwargs: mock_response)
+
     # Act
     output = await agent.format_output(formatting_input)
-    
+
     # Assert
     assert isinstance(output, FormattingOutput)
     assert len(output.tips) == 5
@@ -435,9 +412,7 @@ async def test_format_output_parses_valid_json(
 
 @pytest.mark.asyncio
 async def test_run_agent_parses_valid_json(
-    monkeypatch,
-    formatting_input: FormattingInput,
-    mock_gemini_json_response: str
+    monkeypatch, formatting_input: FormattingInput, mock_gemini_json_response: str
 ):
     """Test that agent.run() correctly parses valid JSON response from Gemini (HAPPY PATH)."""
     # Mock the Gemini API response
@@ -446,18 +421,14 @@ async def test_run_agent_parses_valid_json(
     mock_response.candidates = [MagicMock()]
     mock_response.candidates[0].content.parts = [MagicMock()]
     mock_response.candidates[0].content.parts[0].text = mock_gemini_json_response
-    
+
     # Patch the client's generate_content method
     agent = OutputFormatterAgent(api_key="test_key")
-    monkeypatch.setattr(
-        agent.client.models,
-        'generate_content',
-        lambda **kwargs: mock_response
-    )
-    
+    monkeypatch.setattr(agent.client.models, "generate_content", lambda **kwargs: mock_response)
+
     # Act
     output = await agent.run(formatting_input)
-    
+
     # Assert
     assert isinstance(output, FormattingOutput)
     assert len(output.tips) == 5
@@ -468,8 +439,7 @@ async def test_run_agent_parses_valid_json(
 
 @pytest.mark.asyncio
 async def test_format_output_parses_json_with_markdown(
-    monkeypatch,
-    formatting_input: FormattingInput
+    monkeypatch, formatting_input: FormattingInput
 ):
     """Test that agent handles JSON wrapped in markdown code blocks."""
     # Mock response with markdown code blocks
@@ -483,24 +453,20 @@ async def test_format_output_parses_json_with_markdown(
     "motivation_message": "Test motivation message for markdown parsing"
 }
 ```"""
-    
+
     mock_response = MagicMock()
     mock_response.text = mock_response_text
     mock_response.candidates = [MagicMock()]
     mock_response.candidates[0].content.parts = [MagicMock()]
     mock_response.candidates[0].content.parts[0].text = mock_response_text
-    
+
     # Patch the client's generate_content method
     agent = OutputFormatterAgent(api_key="test_key")
-    monkeypatch.setattr(
-        agent.client.models,
-        'generate_content',
-        lambda **kwargs: mock_response
-    )
-    
+    monkeypatch.setattr(agent.client.models, "generate_content", lambda **kwargs: mock_response)
+
     # Act
     output = await agent.format_output(formatting_input)
-    
+
     # Assert
     assert isinstance(output, FormattingOutput)
     assert len(output.tips) == 3
@@ -510,9 +476,7 @@ async def test_format_output_parses_json_with_markdown(
 
 @pytest.mark.asyncio
 async def test_format_output_invalid_json_triggers_fallback(
-    monkeypatch,
-    formatting_input: FormattingInput,
-    mock_gemini_invalid_json_response: str
+    monkeypatch, formatting_input: FormattingInput, mock_gemini_invalid_json_response: str
 ):
     """Test that invalid JSON response triggers fallback logic."""
     # Mock the Gemini API response with invalid JSON
@@ -521,15 +485,11 @@ async def test_format_output_invalid_json_triggers_fallback(
     mock_response.candidates = [MagicMock()]
     mock_response.candidates[0].content.parts = [MagicMock()]
     mock_response.candidates[0].content.parts[0].text = mock_gemini_invalid_json_response
-    
+
     # Patch the client's generate_content method
     agent = OutputFormatterAgent(api_key="test_key")
-    monkeypatch.setattr(
-        agent.client.models,
-        'generate_content',
-        lambda **kwargs: mock_response
-    )
-    
+    monkeypatch.setattr(agent.client.models, "generate_content", lambda **kwargs: mock_response)
+
     # Act - should raise ValueError which triggers fallback in run()
     with pytest.raises(ValueError, match="Failed to parse Gemini response"):
         await agent.format_output(formatting_input)
@@ -537,9 +497,7 @@ async def test_format_output_invalid_json_triggers_fallback(
 
 @pytest.mark.asyncio
 async def test_run_agent_invalid_json_triggers_fallback(
-    monkeypatch,
-    formatting_input: FormattingInput,
-    mock_gemini_invalid_json_response: str
+    monkeypatch, formatting_input: FormattingInput, mock_gemini_invalid_json_response: str
 ):
     """Test that agent.run() falls back gracefully when JSON parsing fails."""
     # Mock the Gemini API response with invalid JSON
@@ -548,18 +506,14 @@ async def test_run_agent_invalid_json_triggers_fallback(
     mock_response.candidates = [MagicMock()]
     mock_response.candidates[0].content.parts = [MagicMock()]
     mock_response.candidates[0].content.parts[0].text = mock_gemini_invalid_json_response
-    
+
     # Patch the client's generate_content method
     agent = OutputFormatterAgent(api_key="test_key")
-    monkeypatch.setattr(
-        agent.client.models,
-        'generate_content',
-        lambda **kwargs: mock_response
-    )
-    
+    monkeypatch.setattr(agent.client.models, "generate_content", lambda **kwargs: mock_response)
+
     # Act - run() should catch the error and use fallback
     output = await agent.run(formatting_input)
-    
+
     # Assert - should get fallback output
     assert isinstance(output, FormattingOutput)
     assert len(output.tips) > 0
@@ -570,8 +524,7 @@ async def test_run_agent_invalid_json_triggers_fallback(
 
 @pytest.mark.asyncio
 async def test_format_output_fewer_tips_than_requested(
-    monkeypatch,
-    formatting_input: FormattingInput
+    monkeypatch, formatting_input: FormattingInput
 ):
     """Test that agent handles response with fewer tips than requested."""
     # Mock response with only 2 tips (requested 5)
@@ -582,24 +535,20 @@ async def test_format_output_fewer_tips_than_requested(
     ],
     "motivation_message": "Good job planning ahead!"
 }"""
-    
+
     mock_response = MagicMock()
     mock_response.text = mock_response_text
     mock_response.candidates = [MagicMock()]
     mock_response.candidates[0].content.parts = [MagicMock()]
     mock_response.candidates[0].content.parts[0].text = mock_response_text
-    
+
     # Patch the client's generate_content method
     agent = OutputFormatterAgent(api_key="test_key")
-    monkeypatch.setattr(
-        agent.client.models,
-        'generate_content',
-        lambda **kwargs: mock_response
-    )
-    
+    monkeypatch.setattr(agent.client.models, "generate_content", lambda **kwargs: mock_response)
+
     # Act
     output = await agent.format_output(formatting_input)
-    
+
     # Assert - should accept fewer tips
     assert isinstance(output, FormattingOutput)
     assert len(output.tips) == 2
